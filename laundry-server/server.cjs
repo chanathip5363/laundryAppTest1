@@ -11,6 +11,15 @@ app.use(cors());
 const usedTx = new Set();
 app.use(bodyParser.json());
 
+// ✅ เพิ่มตรงนี้
+app.get('/prices', (req, res) => {
+  res.json({
+    1: 20,
+    2: 30,
+    3: 40
+  });
+});
+
 // ===== MQTT =====
 const client = mqtt.connect("mqtts://1f987687489a42f296be8b2579cd71f5.s1.eu.hivemq.cloud:8883",
     {
