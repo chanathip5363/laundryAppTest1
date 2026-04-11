@@ -519,7 +519,7 @@ onClick={async () => {
   }
 
   // ✅ เพิ่มตรงนี้
-  const ok = await checkMachineBeforePay(selectedMachine);
+  const ok = await checkMachineBeforePay();
   if (!ok) return;
 
   // ✅ ของเดิม
@@ -709,7 +709,7 @@ onClick={async () => {
   }
 
   // ✅ เพิ่มตรงนี้
-  const ok = await checkMachineBeforePay(selectedMachine);
+  const ok = await checkMachineBeforePay();
   if (!ok) return;
 
   // ✅ ของเดิม
@@ -803,7 +803,7 @@ onClick={async () => {
   }
 
   // ✅ เพิ่มตรงนี้
-  const ok = await checkMachineBeforePay(selectedMachine);
+  const ok = await checkMachineBeforePay();
   if (!ok) return;
 
   // ✅ ของเดิม
