@@ -495,7 +495,7 @@ onClick={async () => {
     return;
   }
 
-  if (!window.confirm(`ยืนยันชำระ ${setTotalPrice()} บาท ?`)) {
+  if (!window.confirm(`ยืนยันชำระ ${totalPrice()} บาท ?`)) {
     return;
   }
 
@@ -684,7 +684,7 @@ onClick={async () => {
     return;
   }
 
-  if (!window.confirm(`ยืนยันชำระ ${setTotalPrice()} บาท ?`)) {
+  if (!window.confirm(`ยืนยันชำระ ${totalPrice()} บาท ?`)) {
     return;
   }
 
@@ -778,7 +778,7 @@ onClick={async () => {
     return;
   }
 
-  if (!window.confirm(`ยืนยันชำระ ${setTotalPrice()} บาท ?`)) {
+  if (!window.confirm(`ยืนยันชำระ ${totalPrice()} บาท ?`)) {
     return;
   }
 
