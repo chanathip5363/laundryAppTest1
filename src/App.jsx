@@ -198,7 +198,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
 
   useEffect(() => {
 
-    fetch("http://localhost:3000/prices")
+    fetch("https://laundry-server-me68.onrender.com/prices")
       .then(res => res.json())
       .then(data => {
         console.log("Prices", data);
