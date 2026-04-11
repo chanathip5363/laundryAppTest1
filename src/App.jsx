@@ -137,7 +137,6 @@ const STEP_QR = 99;
   return total;
 };
 
-
 const checkMachineBeforePay = async () => {
   try {
     const res = await fetch("https://laundry-server-me68.onrender.com/machine-status/machine1");

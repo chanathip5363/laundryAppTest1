@@ -12,7 +12,6 @@ const usedTx = new Set();
 app.use(bodyParser.json());
 
 // ===== MQTT =====
-
 const client = mqtt.connect("mqtts://1f987687489a42f296be8b2579cd71f5.s1.eu.hivemq.cloud:8883",
     {
         username: "ESP32",
