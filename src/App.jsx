@@ -139,7 +139,7 @@ const STEP_QR = 99;
 
 const checkMachineBeforePay = async () => {
   try {
-    const res = await fetch("https://laundry-server-me68.onrender.com/status/machine1");
+    const res = await fetch("https://laundry-server-me68.onrender.com/nachine-status/machine1");
     const data = await res.json();
 
     if (!data.available) {
