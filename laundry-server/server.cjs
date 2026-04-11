@@ -68,6 +68,7 @@ app.post("/webhook", (req, res) => {
   console.log("Payment received:", txid);
   console.log("🔥🔥🔥 WEBHOOK HIT:", req.body);
 
+
   if (usedTx.has(txid)) {
     console.log("Duplicate (memory) -> ignore");
     return res.sendStatus(200);
@@ -161,4 +162,28 @@ client.on("message", (topic, message)=>{
 // ===== start server =====
 app.listen(3000, ()=>{
     console.log("Server running on port 3000");
+});
+
+app.get("/machine-status/:machine", (req, res) => {
+  const machine = req.params.machine;
+
+  db.get(
+    "SELECT state FROM machines WHERE machine = ?",
+    [machine],
+    (err, row) => {
+      if (err) {
+        console.log("DB error:", err);
+        return res.json({ available: false });
+      }
+
+      // ถ้ายังไม่มีข้อมูล = ถือว่าว่าง
+      if (!row) {
+        return res.json({ available: true });
+      }
+
+      // ว่าง = IDLE เท่านั้น
+      const available = row.state === "IDLE";
+      res.json({ available });
+    }
+  );
 });

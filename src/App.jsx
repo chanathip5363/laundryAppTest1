@@ -471,19 +471,40 @@ client.on("message", (topic, message) => {
   cursor: "pointer",
   marginTop: "10px"
 }}
-onClick={() => {
+// onClick={() => {
+//   const cmd = buildCommand();
+//   console.log(cmd);
+
+//   if(!program){
+//     alert("กรุณาเลือกโปรแกรม");
+//     return;
+//   }
+//   if (!window.confirm(`ยืนยันชำระ ${getTotalPrice()} บาท ?`)) 
+//     return;
+//   //TODO ยิง MQTT หรือไปหน้า QR
+//     setStep(STEP_QR);
+//   // client.publish("laundry/cmd", JSON.stringify(cmd));
+// }}>
+
+onClick={async () => {
   const cmd = buildCommand();
   console.log(cmd);
 
-  if(!program){
+  if (!program) {
     alert("กรุณาเลือกโปรแกรม");
     return;
   }
-  if (!window.confirm(`ยืนยันชำระ ${getTotalPrice()} บาท ?`)) 
+
+  if (!window.confirm(`ยืนยันชำระ ${setTotalPrice()} บาท ?`)) {
     return;
-  //TODO ยิง MQTT หรือไปหน้า QR
-    setStep(STEP_QR);
-  // client.publish("laundry/cmd", JSON.stringify(cmd));
+  }
+
+  // ✅ เพิ่มตรงนี้
+  const ok = await checkMachineBeforePay(selectedMachine);
+  if (!ok) return;
+
+  // ✅ ของเดิม
+  setStep(STEP_QR);
 }}>
   ยืนยันและชำระเงิน</button>
 
@@ -639,19 +660,40 @@ key={temp}>
   cursor: "pointer",
   marginTop: "10px"
 }}
-onClick={() => {
+// onClick={() => {
+//   const cmd = buildCommand();
+//   console.log(cmd);
+
+//   if(!program){
+//     alert("กรุณาเลือกโปรแกรม");
+//     return;
+//   }
+//   if (!window.confirm(`ยืนยันชำระ ${getTotalPrice()} บาท ?`)) 
+//     return;
+//     //TODO ยิง MQTT หรือไปหน้า QR
+//     setStep(STEP_QR);
+//   // client.publish("laundry/cmd", JSON.stringify(cmd));
+// }}>
+
+onClick={async () => {
   const cmd = buildCommand();
   console.log(cmd);
 
-  if(!program){
+  if (!program) {
     alert("กรุณาเลือกโปรแกรม");
     return;
   }
-  if (!window.confirm(`ยืนยันชำระ ${getTotalPrice()} บาท ?`)) 
+
+  if (!window.confirm(`ยืนยันชำระ ${setTotalPrice()} บาท ?`)) {
     return;
-    //TODO ยิง MQTT หรือไปหน้า QR
-    setStep(STEP_QR);
-  // client.publish("laundry/cmd", JSON.stringify(cmd));
+  }
+
+  // ✅ เพิ่มตรงนี้
+  const ok = await checkMachineBeforePay(selectedMachine);
+  if (!ok) return;
+
+  // ✅ ของเดิม
+  setStep(STEP_QR);
 }}>
   ยืนยันและชำระเงิน</button>
 
@@ -712,19 +754,40 @@ onClick={() => {
   cursor: "pointer",
   marginTop: "10px"
 }}
-onClick={() => {
+// onClick={() => {
+//   const cmd = buildCommand();
+//   console.log(cmd);
+
+//   if(!program){
+//     alert("กรุณาเลือกโปรแกรม");
+//     return;
+//   }
+//   if (!window.confirm(`ยืนยันชำระ ${getTotalPrice()} บาท ?`)) 
+//     return;
+//   //TODO ยิง MQTT หรือไปหน้า QR
+//     setStep(STEP_QR);
+//   // client.publish("laundry/cmd", JSON.stringify(cmd));
+// }}>
+
+onClick={async () => {
   const cmd = buildCommand();
   console.log(cmd);
 
-  if(!program){
+  if (!program) {
     alert("กรุณาเลือกโปรแกรม");
     return;
   }
-  if (!window.confirm(`ยืนยันชำระ ${getTotalPrice()} บาท ?`)) 
+
+  if (!window.confirm(`ยืนยันชำระ ${setTotalPrice()} บาท ?`)) {
     return;
-  //TODO ยิง MQTT หรือไปหน้า QR
-    setStep(STEP_QR);
-  // client.publish("laundry/cmd", JSON.stringify(cmd));
+  }
+
+  // ✅ เพิ่มตรงนี้
+  const ok = await checkMachineBeforePay(selectedMachine);
+  if (!ok) return;
+
+  // ✅ ของเดิม
+  setStep(STEP_QR);
 }}>
   ยืนยันและชำระเงิน</button>
 
