@@ -66,6 +66,7 @@ function isMachineRunning(machine, callback){
 app.post("/webhook", (req, res) => {
   const { txid, machine, amount, program, tempPulse, aromaPulse } = req.body;
   console.log("Payment received:", txid);
+  console.log("WEBHOOK HIT:", req.body);
 
   if (usedTx.has(txid)) {
     console.log("Duplicate (memory) -> ignore");
