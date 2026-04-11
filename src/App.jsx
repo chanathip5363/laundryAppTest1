@@ -137,6 +137,25 @@ const STEP_QR = 99;
   return total;
 };
 
+const checkMachineBeforePay = async () => {
+  try {
+    const res = await fetch("https://laundry-server-me68.onrender.com/status/machine1");
+    const data = await res.json();
+
+    if (!data.available) {
+      alert("❌ เครื่องกำลังใช้งาน");
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error(err);
+    alert("⚠️ เชื่อมต่อ server ไม่ได้");
+    return false;
+  }
+};
+
+
  const generateQR = () => {
   const amount = getTotalPrice() || 0;
 
