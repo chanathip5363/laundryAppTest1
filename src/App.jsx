@@ -268,7 +268,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
         amount
       });
 
-      const res = await fetch("http://localhost:3000/webhook", {
+      const res = await fetch("https://laundry-server-me68.onrender.com/webhook", {     // http://localhost:3000/webhook
         method: "POST",
         headers: {
           "Content-Type": "application/json"
