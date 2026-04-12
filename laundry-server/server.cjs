@@ -154,10 +154,6 @@ app.post("/request-qr", (req, res) => {
 
   db.get("SELECT * FROM machines WHERE machine = ?", [machine], (err, row) => {
 
-    if (row && (row.state === "RUNNING" || row.state === "RESERVED")) {
-      return res.json({ success: false, message: "เครื่องไม่ว่าง" });
-    }
-
     // ปลด lock ถ้าหมดเวลาแล้ว
     if (row && row.state === "RESERVED" && row.reserved_until <= now) {
       db.run(`UPDATE machine SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
