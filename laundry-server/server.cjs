@@ -163,7 +163,7 @@ app.post("/request-qr", (req, res) => {
       db.run(`UPDATE machine SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
     }
 
-    if (row && row.state === "RUNNING" {
+    if (row && row.state === "RUNNING") {
       return res.json({ success: false, message: "เครื่องกำลังทำงาน" });
     }
 
