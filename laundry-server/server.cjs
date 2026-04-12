@@ -164,10 +164,18 @@ app.post("/request-qr", (req, res) => {
 
     const reservedUntil = now + 20000; // 20 วินาที
 
-    db.run(`
-      INSERT OR REPLACE INTO machines (machine, state, reserved_until)
-      VALUES (?, 'RESERVED', ?)
-    `, [machine, reservedUntil]);
+if (row) {
+  db.run(`
+    UPDATE machines
+    SET state = 'RESERVED', reserved_until = ?
+    WHERE machine = ?
+  `, [reservedUntil, machine]);
+} else {
+  db.run(`
+    INSERT INTO machines (machine, state, reserved_until)
+    VALUES (?, 'RESERVED', ?)
+  `, [machine, reservedUntil]);
+}
 
     return res.json({
       success: true,
