@@ -147,6 +147,37 @@ app.post("/webhook", (req, res) => {
     });
   });
 });
+
+app.post("/request-qr", (req, res) => {
+  const { machine } = req.body;
+  const now = Date.now();
+
+  db.get("SELECT * FROM machines WHERE machine = ?", [machine], (err, row) => {
+
+    if (row && row.state === "RUNNING") {
+      return res.json({ success: false, message: "เครื่องไม่ว่าง" });
+    }
+
+    if (row && row.state === "RESERVED" && row.reserved_until > now) {
+      return res.json({ success: false, message: "เครื่องไม่ว่าง" });
+    }
+
+    const reservedUntil = now + 20000; // 20 วินาที
+
+    db.run(`
+      INSERT OR REPLACE INTO machines (machine, state, reserved_until)
+      VALUES (?, 'RESERVED', ?)
+    `, [machine, reservedUntil]);
+
+    return res.json({
+      success: true,
+      message: "จองเครื่องสำเร็จ",
+      qr: "TEMP_QR"
+    });
+
+  });
+});
+
 // ===== รับ status จาก ESP =====
 client.subscribe("laundry/+/state");
 
