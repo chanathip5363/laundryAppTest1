@@ -154,7 +154,7 @@ app.post("/request-qr", (req, res) => {
 
   db.get("SELECT * FROM machines WHERE machine = ?", [machine], (err, row) => {
 
-    if (row && row.state === "RUNNING") {
+    if (row && (row.state === "RUNNING" || row.state === "RESERVED")) {
       return res.json({ success: false, message: "เครื่องไม่ว่าง" });
     }
 
@@ -251,5 +251,17 @@ app.get("/fix", (req, res) => {
  app.get("/machines", (req, res) => {
   db.all("SELECT * FROM machines", [], (err, rows) => {
     res.json(rows);
+  });
+});
+
+app.get("/fix-null-machine", (req, res) => {
+  db.run("DELETE FROM machines WHERE machine IS NULL", function (err) {
+    if (err) {
+      console.log("ลบ NULL ไม่สำเร็จ:", err.message);
+      return res.status(500).send("delete failed");
+    }
+
+    console.log("ลบ NULL สำเร็จ", this.changes, "row");
+    res.send(`deleted ${this.changes} row`);
   });
 });
