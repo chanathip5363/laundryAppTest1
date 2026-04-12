@@ -137,17 +137,25 @@ const STEP_QR = 99;
   return total;
 };
 
-const checkMachineBeforePay = async () => {
+ const checkMachineBeforePay = async () => {
   try {
-    const res = await fetch("https://laundry-server-me68.onrender.com/machine-status/machine1");
+    const res = await fetch("https://laundry-server-me68.onrender.com/request-qr", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ machine: "machine1" }),
+    });
+
     const data = await res.json();
 
-    if (!data.available) {
-      alert("❌ เครื่องกำลังใช้งาน");
+    if (!data.success) {
+      alert(data.message || "เครื่องไม่ว่าง");
       return false;
     }
 
     return true;
+
   } catch (err) {
     console.error(err);
     alert("⚠️ เชื่อมต่อ server ไม่ได้");
