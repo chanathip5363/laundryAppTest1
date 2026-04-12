@@ -29,19 +29,30 @@ client.on("connect", () => {
 // ===== DATABASE =====
 const db = new sqlite3.Database("./database.db");
 
+ db.run(`
+  ALTER TABLE machines ADD COLUMN reserved_until INTEGER
+`, (err) => {
+  if (err) {
+    console.log("column อาจมีอยู่แล้ว:", err.message);
+  } else {
+    console.log("เพิ่ม reserved_until สำเร็จ");
+  }
+});
+
 db.run(`
 CREATE TABLE IF NOT EXISTS transactions (
     txid TEXT PRIMARY KEY,
     machine TEXT,
     amount INTEGER,
-    status TEXT
-)
+    status TEXT,
+    )
 `);
 
 db.run(`
 CREATE TABLE IF NOT EXISTS machines (
     machine TEXT PRIMARY KEY,
-    state TEXT
+    state TEXT,
+    reserve_until INTEGER    
 )
 `);
 
