@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     txid TEXT PRIMARY KEY,
     machine TEXT,
     amount INTEGER,
-    status TEXT,
+    status TEXT
     )
 `);
 
