@@ -247,3 +247,9 @@ app.get("/fix", (req, res) => {
   db.run("DELETE FROM machines WHERE machine IS NULL");
   res.send("fixed");
 });
+
+ app.get("/machines", (req, res) => {
+  db.all("SELECT * FROM machines", [], (err, rows) => {
+    res.json(rows);
+  });
+});
