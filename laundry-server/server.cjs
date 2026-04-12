@@ -242,3 +242,8 @@ app.get("/machine-status/:machine", (req, res) => {
     }
   );
 });
+
+app.get("/fix", (req, res) => {
+  db.run("DELETE FROM machines WHERE machine IS NULL");
+  res.send("fixed");
+});
