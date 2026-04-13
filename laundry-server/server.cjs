@@ -129,8 +129,15 @@ app.post("/webhook", (req, res) => {
           // 4. อัพเดทเครื่องเป็น RUNNING
           db.run(
             "UPDATE machines SET state = 'RUNNING', reserved_until = NULL WHERE machine = ?",
-            [machine]
-          );
+            [machine],
+            function (err){
+              if (err){
+                  console.log ("X UPDATE ERROR:", err);
+                } else {
+                 console.log("/ UPDATE RUNNING OK:", this.changes);
+                }
+              }
+            );
 
           // 5. ส่งไป ESP
           const payload = JSON.stringify({
