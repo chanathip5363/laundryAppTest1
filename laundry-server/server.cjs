@@ -7,6 +7,7 @@ const cors = require("cors")
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const usedTx = new Set();
 app.use(bodyParser.json());
@@ -154,6 +155,10 @@ app.post("/request-qr", (req, res) => {
 
   db.get("SELECT * FROM machines WHERE machine = ?", [machine], (err, row) => {
 
+    if(err) {
+      console.error(err);
+      return res.json({success: false, message: "DB error"});
+    }
     // ปลด lock ถ้าหมดเวลาแล้ว
     if (row && row.state === "RESERVED" && row.reserved_until <= now) {
       db.run(`UPDATE machine SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
