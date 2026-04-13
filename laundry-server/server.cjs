@@ -128,8 +128,8 @@ app.post("/webhook", (req, res) => {
 
           // 4. อัพเดทเครื่องเป็น RUNNING
           db.run(
-            "INSERT OR REPLACE INTO machines VALUES (?,?)",
-            [machine, "RUNNING"]
+            "UPDATE machine SET state = 'RUNNING', reserved_until = NULL WHERE machine = ?",
+            [machine]
           );
 
           // 5. ส่งไป ESP
