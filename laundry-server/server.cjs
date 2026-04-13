@@ -128,7 +128,7 @@ app.post("/webhook", (req, res) => {
 
           // 4. อัพเดทเครื่องเป็น RUNNING
           db.run(
-            "UPDATE machine SET state = 'RUNNING', reserved_until = NULL WHERE machine = ?",
+            "UPDATE machines SET state = 'RUNNING', reserved_until = NULL WHERE machine = ?",
             [machine]
           );
 
@@ -166,7 +166,7 @@ app.post("/request-qr", (req, res) => {
 
     // ปลด lock ถ้าหมดเวลาแล้ว
     if (row && row.state === "RESERVED" && row.reserved_until <= now) {
-      db.run(`UPDATE machine SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
+      db.run(`UPDATE machines SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
     }
 
     if (row && row.state === "RESERVED" && row.reserved_until > now) {
