@@ -159,6 +159,11 @@ app.post("/request-qr", (req, res) => {
       console.error(err);
       return res.json({success: false, message: "DB error"});
     }
+
+    if (row && row.state === "RUNNING") {
+      return res.json({ success: false, message: "เครื่องกำลังทำงาน" });
+    }    
+
     // ปลด lock ถ้าหมดเวลาแล้ว
     if (row && row.state === "RESERVED" && row.reserved_until <= now) {
       db.run(`UPDATE machine SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
@@ -166,10 +171,6 @@ app.post("/request-qr", (req, res) => {
 
     if (row && row.state === "RESERVED" && row.reserved_until > now) {
       return res.json({ success: false, message: "เครื่องไม่ว่าง" });
-    }
-
-    if (row && row.state === "RUNNING") {
-      return res.json({ success: false, message: "เครื่องกำลังทำงาน" });
     }
 
     const reservedUntil = now + 20000; // 20 วินาที
