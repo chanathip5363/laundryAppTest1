@@ -20,8 +20,6 @@ const client = mqtt.connect("mqtts://1f987687489a42f296be8b2579cd71f5.s1.eu.hive
     }
 );
 
-const token = Math.random().toString(36).substring(2);
-
 client.on("connect", () => {
     console.log("MQTT connected");
 
@@ -70,13 +68,9 @@ function isMachineRunning(machine, callback){
 
     db.get("SELECT state FROM machines WHERE machine=?", [machine], (err,row)=>{
         if(err || !row){
-          return callback(false);
+            return callback(false);
         }
-        if(row.state === "RUNNING" || row.state === "STARTING"){
-          return callback(true);
-        }
-        
-        return callback(false);
+        callback(row.state === "RUNNING");
     });
 }
 
@@ -95,17 +89,6 @@ app.post("/webhook", (req, res) => {
 
   // 1. กัน tx ซ้ำ
   db.get("SELECT * FROM transactions WHERE txid=?", [txid], (err, row) => {
-
- if (!row) return res.sendStatus(200);
-
-  // 🔥 เช็คเจ้าของ
-  if (row.reserve_token !== token) {
-    console.log("❌ not owner");
-    return res.sendStatus(200);
-  }
-
-  // ✅ ผ่าน → ค่อยทำต่อ
-
     if (err) {
       console.log("DB error", err);
       return res.sendStatus(200);
@@ -145,7 +128,7 @@ app.post("/webhook", (req, res) => {
 
           // 4. อัพเดทเครื่องเป็น RUNNING
           db.run(
-            "UPDATE machines SET state = 'STARTING', reserved_until = NULL WHERE machine = ?",
+            "UPDATE machines SET state = 'RUNNING', reserved_until = NULL WHERE machine = ?",
             [machine],
             function (err){
               if (err){
@@ -173,45 +156,51 @@ app.post("/webhook", (req, res) => {
   });
 });
 
-app.post("/request", (req, res) => {
+app.post("/request-qr", (req, res) => {
   const { machine } = req.body;
+  const now = Date.now();
 
-  const token = Date.now().toString();
+  db.get("SELECT * FROM machines WHERE machine = ?", [machine], (err, row) => {
 
-  db.get("SELECT * FROM machines WHERE machine=?", [machine], (err, row) => {
-    if (err) {
-      console.log("DB error:", err);
-      return res.json({ success: false, message: "DB error" });
+    if(err) {
+      console.error(err);
+      return res.json({success: false, message: "DB error"});
     }
 
-    // ถ้าเครื่องกำลัง RUNNING → ห้ามใช้
     if (row && row.state === "RUNNING") {
+      return res.json({ success: false, message: "เครื่องกำลังทำงาน" });
+    }    
+
+    // ปลด lock ถ้าหมดเวลาแล้ว
+    if (row && row.state === "RESERVED" && row.reserved_until <= now) {
+      db.run(`UPDATE machines SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
+    }
+
+    if (row && row.state === "RESERVED" && row.reserved_until > now) {
       return res.json({ success: false, message: "เครื่องไม่ว่าง" });
     }
 
-    // 🔥 ล็อคเครื่องทันที
-    db.run(
-      `INSERT INTO machines (machine, state, reserve_token, reserved_until)
-       VALUES (?, 'RESERVED', ?, datetime('now', '+20 seconds'))
-       ON CONFLICT(machine) DO UPDATE SET
-         state='RESERVED',
-         reserve_token=?,
-         reserved_until=datetime('now', '+20 seconds')`,
-      [machine, token, token],
-      (err) => {
-        if (err) {
-          console.log("Reserve error:", err);
-          return res.json({ success: false, message: "Reserve error" });
-        }
+    const reservedUntil = now + 20000; // 20 วินาที
 
-        console.log("Machine reserved:", machine);
+if (row) {
+  db.run(`
+    UPDATE machines
+    SET state = 'RESERVED', reserved_until = ?
+    WHERE machine = ?
+  `, [reservedUntil, machine]);
+} else {
+  db.run(`
+    INSERT INTO machines (machine, state, reserved_until)
+    VALUES (?, 'RESERVED', ?)
+  `, [machine, reservedUntil]);
+}
 
-        return res.json({
-          success: true,
-          token: token
-        });
-      }
-    );
+    return res.json({
+      success: true,
+      message: "จองเครื่องสำเร็จ",
+      qr: "TEMP_QR"
+    });
+
   });
 });
 

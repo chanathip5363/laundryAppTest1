@@ -137,11 +137,9 @@ const STEP_QR = 99;
   return total;
 };
 
-const [reserveToken, setReserveToken] = useState(null);
-
-const checkMachineBeforePay = async () => {
+ const checkMachineBeforePay = async () => {
   try {
-    const res = await fetch("https://laundry-server-me68.onrender.com/request", {
+    const res = await fetch("https://laundry-server-me68.onrender.com/request-qr", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -156,17 +154,15 @@ const checkMachineBeforePay = async () => {
       return false;
     }
 
-    // 🔥 เก็บ token
-    setReserveToken(data.token);
-
     return true;
 
   } catch (err) {
     console.error(err);
-    alert("เชื่อมต่อ server ไม่ได้");
+    alert("⚠️ เชื่อมต่อ server ไม่ได้");
     return false;
   }
 };
+
 
  const generateQR = () => {
   const amount = getTotalPrice() || 0;
@@ -309,7 +305,6 @@ const [aromaSelected, setAromaSelected] = useState(null);
           machine,
           amount, 
           program,
-          token: reserveToken,
           tempPulse: getTempPulse(),
           aromaPulse: getAromaPulse()          
         })
@@ -1027,12 +1022,9 @@ onClick={async () => {
     }}>
       จำลองจ่ายแล้ว
     </button>
-    
   </>
 )}
-
   </div>
-
   );
 }
 
