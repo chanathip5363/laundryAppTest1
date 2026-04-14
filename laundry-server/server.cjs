@@ -126,9 +126,9 @@ app.post("/webhook", (req, res) => {
             return res.sendStatus(200);
           }
 
-          // 4. อัพเดทเครื่องเป็น RUNNING
+          // 4. อัพเดทเครื่องเป็น STARTING
           db.run(
-            "UPDATE machines SET state = 'RUNNING', reserved_until = NULL WHERE machine = ?",
+            "UPDATE machines SET state = 'STARTING', reserved_until = NULL WHERE machine = ?",
             [machine],
             function (err){
               if (err){
