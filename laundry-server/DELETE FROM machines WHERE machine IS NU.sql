@@ -1,0 +1,1 @@
+DELETE FROM machines WHERE machine IS NULL;

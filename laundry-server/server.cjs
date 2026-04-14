@@ -173,39 +173,38 @@ app.post("/webhook", (req, res) => {
   });
 });
 
-app.post("/request-qr", (req, res) => {
+app.post("/request", (req, res) => {
   const { machine } = req.body;
-  const now = Date.now();
 
-  const token = Math.random().toString(36).substring(2, 10);
-  const reservedUntil = now + 20000; // 20 วิ
+  const token = Date.now().toString();
 
-  db.get("SELECT * FROM machines WHERE machine = ?", [machine], (err, row) => {
+  db.get("SELECT * FROM machines WHERE machine=?", [machine], (err, row) => {
     if (err) {
-      console.log(err);
+      console.log("DB error:", err);
       return res.json({ success: false, message: "DB error" });
     }
 
-    // 🔥 ถ้า RUNNING → ห้ามเข้า
+    // ถ้าเครื่องกำลัง RUNNING → ห้ามใช้
     if (row && row.state === "RUNNING") {
-      return res.json({ success: false, message: "เครื่องกำลังทำงาน" });
-    }
-
-    // 🔥 ถ้า RESERVED และยังไม่หมดเวลา → check owner
-    if (row && row.state === "RESERVED" && row.reserved_until > now) {
       return res.json({ success: false, message: "เครื่องไม่ว่าง" });
     }
 
-    // 🔥 ถ้าหมดเวลา หรือยังไม่มี → จองใหม่
+    // 🔥 ล็อคเครื่องทันที
     db.run(
-      `INSERT OR REPLACE INTO machines (machine, state, reserved_until, reserve_token)
-       VALUES (?, 'RESERVED', ?, ?)`,
-      [machine, reservedUntil, token],
-      function (err) {
+      `INSERT INTO machines (machine, state, reserve_token, reserved_until)
+       VALUES (?, 'RESERVED', ?, datetime('now', '+20 seconds'))
+       ON CONFLICT(machine) DO UPDATE SET
+         state='RESERVED',
+         reserve_token=?,
+         reserved_until=datetime('now', '+20 seconds')`,
+      [machine, token, token],
+      (err) => {
         if (err) {
-          console.log(err);
-          return res.json({ success: false, message: "DB error" });
+          console.log("Reserve error:", err);
+          return res.json({ success: false, message: "Reserve error" });
         }
+
+        console.log("Machine reserved:", machine);
 
         return res.json({
           success: true,
