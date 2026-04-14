@@ -141,7 +141,7 @@ const [reserveToken, setReserveToken] = useState(null);
 
 const checkMachineBeforePay = async () => {
   try {
-    const res = await fetch("https://laundry-server-me68.onrender.com/request-qr", {
+    const res = await fetch("https://laundry-server-me68.onrender.com/request", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
