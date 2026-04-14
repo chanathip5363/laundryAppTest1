@@ -68,9 +68,13 @@ function isMachineRunning(machine, callback){
 
     db.get("SELECT state FROM machines WHERE machine=?", [machine], (err,row)=>{
         if(err || !row){
-            return callback(false);
+          return callback(false);
         }
-        callback(row.state === "RUNNING");
+        if(row.state === "RUNNING" || row.state === "STARTING"){
+          return callback(true);
+        }
+        
+        return callback(false);
     });
 }
 
@@ -128,7 +132,7 @@ app.post("/webhook", (req, res) => {
 
           // 4. อัพเดทเครื่องเป็น RUNNING
           db.run(
-            "UPDATE machines SET state = 'RUNNING', reserved_until = NULL WHERE machine = ?",
+            "UPDATE machines SET state = 'STARTING', reserved_until = NULL WHERE machine = ?",
             [machine],
             function (err){
               if (err){
