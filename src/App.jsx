@@ -25,7 +25,7 @@ const [basePrice, setBasePrice] = useState(0);
 const [tempOption, setTempOption] = useState(null);
 // "20" | "30" | "40" | "60" | "90" | null
 
-const [aromaOption, setAromaOption] = useState(false);
+const [aromaOption, setAromaOption] = useState(null);
 
 const [temp, setTemp] = useState(null);
 const [spin, setSpin] = useState(null);
@@ -186,7 +186,7 @@ const getAromaPulse = () => {
 const buildCommand = () => {
   return {
     program: program,
-    // tempPulse: getTempPulse(),
+    tempPulse: getTempPulse(),
     aromaPulse: getAromaPulse()
   };
 };
@@ -290,7 +290,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
         txid,
         machine,
         program,
-          tempPulse: getTempPulse(),        
+        tempPulse: getTempPulse(),        
         aromaPulse: getAromaPulse(),         
         amount
       });
