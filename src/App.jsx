@@ -25,7 +25,7 @@ const [basePrice, setBasePrice] = useState(0);
 const [tempOption, setTempOption] = useState(null);
 // "20" | "30" | "40" | "60" | "90" | null
 
-const [aromaOption, setAromaOption] = useState(null);
+const [aromaOption, setAromaOption] = useState(null);  // เดิม false
 
 const [temp, setTemp] = useState(null);
 const [spin, setSpin] = useState(null);
@@ -657,6 +657,10 @@ key={temp}>
 <br />
 
 {/* 🔥 Aroma (อิสระ) */}
+
+if (program === 2) {
+
+
 <h3>เพิ่มความหอม</h3>
 
 <label>
@@ -668,6 +672,8 @@ key={temp}>
       setAroma(1);      
     }}/>เพิ่ม Aroma (+5 บาท)
 </label>
+};
+
         <br/>
         <button onClick={() => {
           resetOptions();
