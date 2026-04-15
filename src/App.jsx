@@ -658,7 +658,7 @@ key={temp}>
 
 {/* 🔥 Aroma (อิสระ) */}
 
-if (program === 2) {
+if (program = 2) {
 
 
 <h3>เพิ่มความหอม</h3>
