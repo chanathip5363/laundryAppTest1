@@ -679,18 +679,32 @@ key={temp}>
 ))}
 <br />
 
-{/* 🔥 Aroma (อิสระ) */}
-<h3>เพิ่มความหอม</h3>
+{aromaOptionsMap[program]?.map((aroma) => (
+  
+  <label 
+  style={{
+  display: "block",
+  padding: "8px",
+  borderRadius: "8px",
+  background: aromaOption === aroma ? "#e0f2fe" : "transparent"
+}}
 
-<label>
-  <input
-    type="checkbox"
-    checked={aromaOption}
-    onChange={() => {
-      setAromaOption(!aromaOption);
-      setAroma(1);      
-    }}/>เพิ่ม Aroma (+5 บาท)
-</label>
+
+key={aroma}>
+  {/* 🔥 Aroma (อิสระ) */}
+  <h3>เพิ่มความหอม</h3>
+    <input
+      type="checkbox"
+      checked={aromaOption === aroma}
+      onChange={() =>
+        setAromaOption(aromaOption === aroma ? null : aroma)
+      }
+    />
+    
+    {aroma}   {/*// เดิม {temp}°C (+ {tempPriceMap[temp]} บาท) แต่ใส่ ?? 0 เพิ่มกันพลาดเผื่อไม่มีราคา*/}
+  </label>
+))}
+
         <br/>
         <button onClick={() => {
           resetOptions();
