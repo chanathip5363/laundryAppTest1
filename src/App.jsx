@@ -16,10 +16,11 @@ function App() {
   const [prices, setPrices] = useState({}); // 200369-02 เพิ่ม state เก็บราคา
 
 
-
 const [step, setStep] = useState(1);
 const [mode, setMode] = useState(null);
 const [basePrice, setBasePrice] = useState(0);
+
+const [modeTemp, setModeTemp] = useState(null);
 
 // กำหนดขึ้นมาเพื่อกำหนดค่าอ้างอิงว่ามีทั้งหมด กี่องศา บ้าง
 const [tempOption, setTempOption] = useState(null);
@@ -28,8 +29,7 @@ const [tempOption, setTempOption] = useState(null);
 const [tempShowOption, setTempShowOption] = useState(null);
 const [tempShow, setTempShow] = useState(null);
 
-
-const [aromaOption, setAromaOption] = useState(null);  // เดิม false
+const [aromaOption, setAromaOption] = useState(null);
 
 const [temp, setTemp] = useState(null);
 const [spin, setSpin] = useState(null);
@@ -50,7 +50,7 @@ const tempOptionsMap = {
   5: ["30", "40", "60"],   // step จริง ["20", "30", "40", "60"]
   6: ["30", "40"],   // step จริง ["20", "30", "40"]  
   7: ["30", "40", "60", "90"],   // step จริง ["20", "30", "40", "60", "90"]
-  8: ["30", "40", "60"],   // step จริง ["20", "30", "40", "60"]
+  8: ["30", "40", "60"]   // step จริง ["20", "30", "40", "60"]
   // 9: ["20"] เอาออกเพราะเพิ่ม 20 องศา ก็เหมือนไม่เพิิ่ม ไม่ควรคิดเงิน
 };
 
@@ -65,6 +65,18 @@ const tempShowOptionsMap = {
   8: ["🌡️ เพิ่มอุณหภูมิ"]
   // 9: ["🌡️ เพิ่มอุณหภูมิ"]
 };
+
+
+const aromaOptionsMap = {
+  1: ["เพิ่ม Aroma (+5 บาท)"],   // step จริง ["20", "30", "40"]
+  // 2: [null],
+  // 3: [null],
+  5: ["เพิ่ม Aroma (+5 บาท)"],
+  7: ["เพิ่ม Aroma (+5 บาท)"],
+  8: ["เพิ่ม Aroma (+5 บาท)"]
+  // 9: [null]
+};
+
 
 
 const programNameMap = {
