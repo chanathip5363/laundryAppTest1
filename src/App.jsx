@@ -25,6 +25,10 @@ const [basePrice, setBasePrice] = useState(0);
 const [tempOption, setTempOption] = useState(null);
 // "20" | "30" | "40" | "60" | "90" | null
 
+const [tempShowOption, setTempShowOption] = useState(null);
+const [tempShow, setTempShow] = useState(null);
+
+
 const [aromaOption, setAromaOption] = useState(null);  // เดิม false
 
 const [temp, setTemp] = useState(null);
@@ -49,6 +53,19 @@ const tempOptionsMap = {
   8: ["30", "40", "60"],   // step จริง ["20", "30", "40", "60"]
   // 9: ["20"] เอาออกเพราะเพิ่ม 20 องศา ก็เหมือนไม่เพิิ่ม ไม่ควรคิดเงิน
 };
+
+const tempShowOptionsMap = {
+  1: ["🌡️ เพิ่มอุณหภูมิ"],
+  2: ["🌡️ เพิ่มอุณหภูมิ"],
+  3: ["🌡️ เพิ่มอุณหภูมิ"],
+  4: ["🌡️ เพิ่มอุณหภูมิ"],
+  5: ["🌡️ เพิ่มอุณหภูมิ"],
+  6: ["🌡️ เพิ่มอุณหภูมิ"],
+  7: ["🌡️ เพิ่มอุณหภูมิ"],
+  8: ["🌡️ เพิ่มอุณหภูมิ"]
+  // 9: ["🌡️ เพิ่มอุณหภูมิ"]
+};
+
 
 const programNameMap = {
   0:  null,
@@ -630,10 +647,16 @@ onClick={async () => {
 </div>
 
 {/* 🔥 อุณหภูมิ (เลือกได้ตัวเดียว) */}
-<div style={{ marginBottom: "15px" }}>
-  <h4>🌡️ เพิ่มอุณหภูมิ</h4>
-  {/* checkbox */}
-</div>
+{tempShowOptionsMap[program]?.map((tempShow)  => (
+  <label 
+  style={{
+  display: "block",
+  padding: "8px",
+  borderRadius: "8px",
+}}>🌡️ เพิ่มอุณหภูมิ
+  </label>
+))}
+
 
 {tempOptionsMap[program]?.map((temp) => (
   <label 
@@ -657,10 +680,6 @@ key={temp}>
 <br />
 
 {/* 🔥 Aroma (อิสระ) */}
-
-if (program = 2) {
-
-
 <h3>เพิ่มความหอม</h3>
 
 <label>
@@ -672,8 +691,6 @@ if (program = 2) {
       setAroma(1);      
     }}/>เพิ่ม Aroma (+5 บาท)
 </label>
-};
-
         <br/>
         <button onClick={() => {
           resetOptions();
