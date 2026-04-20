@@ -203,7 +203,7 @@ const STEP_QR = 99;
 
 const resetOptions = () => {  // เพื่อคืนค่าราคาเป็น 0 บาท ตอนย้อนกลับ
   setTempOption(null); 
-  setAromaOption(false);
+  setAromaOption(null);
   setProgramPrice(0);
 };
 
