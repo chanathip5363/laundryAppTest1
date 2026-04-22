@@ -815,8 +815,8 @@ onClick={async () => {
 
         <br/>
         <button onClick={() => {
-          resetOptions();
-          setProgram(0);                    
+          resetOptions();   // เป็นการรีเซ็ทราคาให้เป็น  0 บาท ก่อน เพื่อไม่ให้สับสน ราคาติดกับของเดิมที่ไปเลือกก่อนหน้า
+          setProgram(0);
           setStep(2)}}>ย้อนกลับ</button>
 
 <button 
