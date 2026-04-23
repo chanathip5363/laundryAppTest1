@@ -112,7 +112,8 @@ const tempCycleMap = {
   6: ["normal", "normal", "20", "30", "40"],
   7: ["40", "40", "60", "90", "normal", "20", "30"],
   8: ["30", "30", "40", "60", "normal", "20"],
-  9: ["normal", "normal"]
+  9: ["normal", "normal"],
+  10: ["normal", "normal"]  
 };
 
 const defaultTempMap = {
@@ -124,7 +125,8 @@ const defaultTempMap = {
   6: "normal",
   7: "40",
   8: "30",
-  9: "normal"
+  9: "normal",
+  10: null
 };
 
 const getTempPulse = () => {
@@ -229,7 +231,8 @@ const startTempMap = {    // จำนวนพัลส์ให้กลับ
       6: 0,  // setProgram 6      
       7: 3,  // setProgram 7
       8: 3,  // setProgram 8            
-      9: 0   // setProgram 9 
+      9: 0,   // setProgram 9
+      10: null 
     };
 
 // const getTempPulse = () => {
@@ -254,7 +257,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
 
   useEffect(() => {
 
-    fetch("https://laundry-server-me68.onrender.com/prices")
+    fetch("https://laundry-server-me68.onrender.com/prices")  //https://laundry-server-me68.onrender.com/prices  http://localhost:3000/prices 
       .then(res => res.json())
       .then(data => {
         console.log("Prices", data);
@@ -324,7 +327,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
         amount
       });
 
-      const res = await fetch("https://laundry-server-me68.onrender.com/webhook", {     // http://localhost:3000/webhook
+      const res = await fetch("https://laundry-server-me68.onrender.com/webhook", {     // https://laundry-server-me68.onrender.com/webhook http://localhost:3000/webhook
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -448,8 +451,13 @@ client.on("message", (topic, message) => {
         <button onClick={() => {     
           setPrices(50);          
           setStep(2_3);
+          setProgram(10);
+          setProgramPrice(50);          
         }}>50 บาท</button>
       </div>
+
+
+
 <div style={{ marginBottom: "10px" }}>
 <h4>รายละเอียด<br/>
     - ซักอบด้วยไอน้ำ 2:39<br/>
@@ -780,6 +788,7 @@ onClick={async () => {
     {/* STEP 2_3 */}
     {step === 2_3 && (
       <>
+
 <h2 style={{marginBottom: "10px"}}>
   {programNameMap[program] ?? "เลือกโปรแกรมซัก"}
 </h2>
@@ -796,10 +805,10 @@ onClick={async () => {
 
   <p>🧺 โปรแกรม: <b>{programNameMap[program] ?? "-"}</b></p>
 
-  <p>
+  {/* <p>
     🌡️ อุณหภูมิ:{" "}
     <b>{tempOption ? tempOption + "°C" : "ปกติ"}</b>
-  </p>
+  </p> */}
 
   <hr style={{ margin: "10px 0" }} />
 
@@ -808,10 +817,10 @@ onClick={async () => {
   </h2>
 </div>
 
-        <button onClick={() => {
+        {/* <button onClick={() => {
           setProgram(10);
           setProgramPrice(50); 
-        }}>ซักอบไอน้ำ</button>
+        }}>ซักอบไอน้ำ</button>      คัดลอกคำสั่งไปไว้ตรงราคา 50 บาท แล้ว*/}
 
         <br/>
         <button onClick={() => {
