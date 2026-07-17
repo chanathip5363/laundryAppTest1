@@ -170,7 +170,7 @@ const STEP_QR = 99;
 
  const checkMachineBeforePay = async () => {
   try {
-    const res = await fetch("https://laundry-server-me68.onrender.com/request-qr", {
+    const res = await fetch("http://localhost:3000/request-qr", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -257,13 +257,6 @@ const [aromaSelected, setAromaSelected] = useState(null);
 
   useEffect(() => {
 
-    fetch("https://laundry-server-me68.onrender.com/prices")  //https://laundry-server-me68.onrender.com/prices  http://localhost:3000/prices 
-      .then(res => res.json())
-      .then(data => {
-        console.log("Prices", data);
-        setPrices(data);
-      });
-
     const mqttClient = mqtt.connect(broker, options);   
     mqttClient.on("connect", () => {
       console.log("MQTT Connected");
@@ -327,7 +320,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
         amount
       });
 
-      const res = await fetch("https://laundry-server-me68.onrender.com/webhook", {     // https://laundry-server-me68.onrender.com/webhook http://localhost:3000/webhook
+      const res = await fetch("http://localhost:3000/webhook", {     
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -397,7 +390,7 @@ client.on("message", (topic, message) => {
         <br/>
         <button onClick={finishWash}>ซักเสร็จ</button>        
 
-      </>
+          </>
     )}
 
     {/* STEP 2 */}
@@ -597,7 +590,7 @@ onClick={async () => {
           setProgram(3);
           setProgramPrice(30);          
           setStep(2_2_1);
-        }}>ผ้าบอบบาง</button>
+    }}>ผ้าบอบบาง</button>
 
         <button onClick={() => {
           setProgram(5);
