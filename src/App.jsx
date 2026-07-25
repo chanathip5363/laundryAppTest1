@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import mqtt from "mqtt";
+import mqttClient from "./mqtt/mqttClient";
 
 import {
   tempOptionsMap,
@@ -11,13 +11,6 @@ import {
   defaultTempMap
 } from "./constants/laundryConfig";
 
-const broker = "wss://1f987687489a42f296be8b2579cd71f5.s1.eu.hivemq.cloud:8884/mqtt";
-
-const options = {
-  username: "ESP32",
-  password: "Laundry123",
-  reconnectPeriod: 1000
-};
 
 function App() {
   const [client, setClient] = useState(null);
@@ -196,28 +189,32 @@ const [aromaSelected, setAromaSelected] = useState(null);
 
   useEffect(() => {
 
-    const mqttClient = mqtt.connect(broker, options);   
-    mqttClient.on("connect", () => {
+    const mqtt = mqttClient;   
+    mqtt.on("connect", () => {
       console.log("MQTT Connected");
       setStatus("Connected");
 
-      mqttClient.subscribe("laundry/machine1/state");
-      mqttClient.subscribe("laundry/machine1/status");
+      mqtt.subscribe("laundry/machine1/state");
+      mqtt.subscribe("laundry/machine1/status");
     });
 
-    mqttClient.on("message", (topic, message) => {
+    mqtt.on("message", (topic, message) => {
       console.log(topic + ":" + message.toString());
     });
 
-    mqttClient.on("error", (err) => {
+    mqtt.on("error", (err) => {
       console.log("MQTT error:", err);
     });
 
-    setClient(mqttClient);
+    setClient(mqtt);
 
     return () => {
-      mqttClient.end();
-    };
+  // ไม่ต้องปิด mqttClient เพราะใช้ร่วมกันทั้งโปรแกรม
+};
+
+    // return () => {
+    //   mqtt.end();
+    // };
   }, []);
 
   const confirmWash = async () => {
