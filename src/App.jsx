@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import mqttClient from "./mqtt/mqttClient";
-
+import { getTempPulse } from "./utils/getTempPulse";
+import { getAromaPulse } from "./utils/getAromaPulse";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -57,27 +58,6 @@ const [dry2program, setDry2Program] = useState({});
 // 220369 15:00 เป็นการ map ค่าราคาที่เพิ่ม เพื่อให้แสดงในหน้าอุณหภูมิ เพราะเดิมมีแต่ องศา แสดงตาม tempOptionMap
 // ซึ่งถ้าเพิ่ม (+ 5 บาท) มันจะเพิ่มทุก องศา จึงใช้วิธีนี้และใช้โค้ด °C (+ {tempPriceMap[temp]} บาท)
 
-
-
-
-
-const getTempPulse = () => {
-  const cycle = tempCycleMap[program] || [];
-  const current = defaultTempMap[program];
-
-  // ถ้าไม่เลือก temp → target = normal
-  const target = tempOption || "normal";
-
-  let count = 0;
-  let i = cycle.indexOf(current);
-
-  while (cycle[i] !== target) {
-    i = (i + 1) % cycle.length;
-    count++;
-  }
-
-  return count;
-};
 
 const [programPrice, setProgramPrice] = useState(0);
 
@@ -142,15 +122,11 @@ const resetOptions = () => {  // เพื่อคืนค่าราคา�
 };
 
 
-const getAromaPulse = () => {
-  return aromaOption ? 1 : 0;
-};
-
 const buildCommand = () => {
   return {
     program: program,
-    tempPulse: getTempPulse(),
-    aromaPulse: getAromaPulse()
+    tempPulse: getTempPulse(program, tempOption),
+    aromaPulse: getAromaPulse(aromaOption)
   };
 };
 
@@ -166,17 +142,7 @@ const startTempMap = {    // จำนวนพัลส์ให้กลับ
       9: 0,   // setProgram 9
       10: null 
     };
-
-// const getTempPulse = () => {
-//   if (!tempOption) return 0;
-
-//   const options = tempOptionsMap[program] || [];
-//   const index = options.indexOf(tempOption);
-
-//   if (index === -1) return 0;
-
-//   return startTempMap[program] + index;
-// };    
+  
 
 const [tempSelected, setTempSelected] = useState(null);
 const [aromaSelected, setAromaSelected] = useState(null);
@@ -251,8 +217,8 @@ const [aromaSelected, setAromaSelected] = useState(null);
         txid,
         machine,
         program,
-        tempPulse: getTempPulse(),        
-        aromaPulse: getAromaPulse(),         
+        tempPulse: getTempPulse(program, tempOption),        
+        aromaPulse: getAromaPulse(aromaOption),         
         amount
       });
 
@@ -266,8 +232,8 @@ const [aromaSelected, setAromaSelected] = useState(null);
           machine,
           amount, 
           program,
-          tempPulse: getTempPulse(),
-          aromaPulse: getAromaPulse()          
+          tempPulse: getTempPulse(program, tempOption),
+          aromaPulse: getAromaPulse(aromaOption)          
         })
       });
 
