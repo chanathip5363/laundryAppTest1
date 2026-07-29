@@ -4,6 +4,7 @@ import { getTempPulse } from "./utils/getTempPulse";
 import { getAromaPulse } from "./utils/getAromaPulse";
 import { MQTT_TOPICS } from "./constants/mqttTopics";
 import { setupMqttHandlers } from "./mqtt/mqttHandlers";
+import { calculateTotalPrice } from "./price/priceLogic";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -65,21 +66,15 @@ const [programPrice, setProgramPrice] = useState(0);
 
 const STEP_QR = 99;
 
- const getTotalPrice = () => {
-  console.log("programPrice : ", programPrice);
-  let total = 0;
-  if(programPrice) total += programPrice;
- // ราคาหลักของโปรแกรม
+const getTotalPrice = () => {
 
-  if (tempOption) {
-    total += tempPriceMap[tempOption] ?? 0;
-  }
+  return calculateTotalPrice({
+    programPrice,
+    tempOption,
+    aromaOption,
+    tempPriceMap
+  });
 
-  if (aromaOption) {
-    total += 5;
-  }
-  console.log("totalPrice : ", total);  
-  return total;
 };
 
  const checkMachineBeforePay = async () => {
