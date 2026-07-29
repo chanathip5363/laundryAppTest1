@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import mqttClient from "./mqtt/mqttClient";
 import { getTempPulse } from "./utils/getTempPulse";
 import { getAromaPulse } from "./utils/getAromaPulse";
+import { MQTT_TOPICS } from "./constants/mqttTopics";
+import { setupMqttHandlers } from "./mqtt/mqttHandlers";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -160,8 +162,8 @@ const [aromaSelected, setAromaSelected] = useState(null);
       console.log("MQTT Connected");
       setStatus("Connected");
 
-      mqtt.subscribe("laundry/machine1/state");
-      mqtt.subscribe("laundry/machine1/status");
+      mqtt.subscribe(MQTT_TOPICS.MACHINE1.STATE);
+      mqtt.subscribe(MQTT_TOPICS.MACHINE1.STATUS);
     });
 
     mqtt.on("message", (topic, message) => {
@@ -245,20 +247,16 @@ const [aromaSelected, setAromaSelected] = useState(null);
 
   const finishWash = () => {
     if (client) {
-      client.publish("laundry/machine1/finish", "done");
+      client.publish(MQTT_TOPICS.MACHINE1.FINISH, "done");
       console.log("Finish pressed");
       setStep(1);
       setMode(null);
     }
 
-client.subscribe("laundry/machine1/finish");
+client.subscribe(MQTT_TOPICS.MACHINE1.FINISH);
 
-client.on("message", (topic, message) => {
-  if (topic === "laundry/machine1/finish") {
-    console.log("Finish from ESP");
-
-    finishWash();
-  }
+setupMqttHandlers(client, {
+  finishWash
 });
 
   };
