@@ -6,6 +6,7 @@ import { MQTT_TOPICS } from "./constants/mqttTopics";
 import { setupMqttHandlers } from "./mqtt/mqttHandlers";
 import { calculateTotalPrice } from "./price/priceLogic";
 import ServiceSelection from "./components/ServiceSelection";
+import WashPriceSelection from "./components/WashPriceSelection";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -288,77 +289,29 @@ setupMqttHandlers(client, {
   </>
 )}
 
-    {/* STEP 2 */}
-    {step === 2 && (
-      <>
-        <h2>เลือกราคา</h2>
+{/* STEP 2 */}
+{step === 2 && (
+  <WashPriceSelection
+    onSelect20={() => {
+      setPrices(20);
+      setStep(2_1);
+    }}
 
-<div style={{ display: "flex", gap: "40px", alignItems: "flex-start", marginBottom: "20px"}}>       
-{/* ฝั่งขวา = รายละเอียด */}
-        <div style={{ width: "120px"}}>
-        <button onClick={() => {
-          setPrices(20);
-          setStep(2_1);
-        }}>20 บาท</button>
-   </div>
+    onSelect30={() => {
+      setPrices(30);
+      setStep(2_2);
+    }}
 
-<div style={{ marginBottom: "10px" }}>
-<h4>รายละเอียด<br />
-    - จำนวนผ้า 2 กก. หรือ 15 ชิ้น <br />
-    - ซักด่วน 15 นาที <br />    
-    - ซักแบบประหยัด 0:57</h4>
-   </div>
-  </div>
+    onSelect50={() => {
+      setPrices(50);
+      setStep(2_3);
+      setProgram(10);
+      setProgramPrice(50);
+    }}
 
-<div style={{ display: "flex", gap: "40px", alignItems: "flex-start", marginBottom: "20px"}}>       
-{/* ฝั่งขวา = รายละเอียด */}
-        <div style={{ width: "120px"}}>
-        <button onClick={() => {
-          setPrices(30);
-          setStep(2_2);
-        }}>30 บาท</button>
-      </div>
-
-<div style={{ marginBottom: "10px" }}>
-<h4>รายละเอียด<br/>
-    - ชุดกีฬา 0:45<br/>
-    - ผ้าขนสัตว์ 1:07<br/>
-    - ผ้าบอบบาง 0:50<br/>
-    - ผ้าผสม 45 นาที 0:45<br/>
-    - ผ้าฝ้าย 1:18<br/>
-    - ผ้าขาว 1:09<br/>
-    - ซักถนอมผ้า 1:03<br/>                
-    </h4>
-   </div>
-  </div>
-
-        
-<div style={{ display: "flex", gap: "40px", alignItems: "flex-start", marginBottom: "20px"}}>       
-{/* ฝั่งขวา = รายละเอียด */}
-        <div style={{ width: "120px"}}>
-        <button onClick={() => {     
-          setPrices(50);          
-          setStep(2_3);
-          setProgram(10);
-          setProgramPrice(50);          
-        }}>50 บาท</button>
-      </div>
-
-
-
-<div style={{ marginBottom: "10px" }}>
-<h4>รายละเอียด<br/>
-    - ซักอบด้วยไอน้ำ 2:39<br/>
-    - เพื่อการแทรกซึมเข้าใยเนื้อผ้า<br/>
-    - เพิ่มประสิทธิภาพในการกำจัดเชื้อโรค<br/>
-    </h4>
-    </div>
-  </div>
-
-        <br /><br />
-        <button onClick={() => setStep(1)}>ย้อนกลับ</button>
-      </>
-    )}
+    onBack={() => setStep(1)}
+  />
+)}
 
     {/* STEP 2_1 */}
     {step === 2_1 && (
