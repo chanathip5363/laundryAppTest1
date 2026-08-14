@@ -5,6 +5,7 @@ import { getAromaPulse } from "./utils/getAromaPulse";
 import { MQTT_TOPICS } from "./constants/mqttTopics";
 import { setupMqttHandlers } from "./mqtt/mqttHandlers";
 import { calculateTotalPrice } from "./price/priceLogic";
+import ServiceSelection from "./components/ServiceSelection";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -268,25 +269,24 @@ setupMqttHandlers(client, {
 
     <p>MQTT Status : {status}</p>
 
-    {/* STEP 1 */}
-    {step === 1 && (
-      <>
-        <h2>เลือกประเภท</h2>
-        <button onClick={() => {
-          setMode("wash");
-          setStep(2);
-        }}>ซัก</button>
+{/* STEP 1 */}
+{step === 1 && (
+  <>
+    <ServiceSelection
+      onSelectWash={() => {
+        setMode("wash");
+        setStep(2);
+      }}
+      onSelectDry={() => {
+        setMode("dry");
+        setStep(3);
+      }}
+    />
 
-        <button onClick={() => {
-          setMode("dry");
-          setStep(3);
-        }}>อบ</button>
-
-        <br/>
-        <button onClick={finishWash}>ซักเสร็จ</button>        
-
-          </>
-    )}
+    <br />
+    <button onClick={finishWash}>ซักเสร็จ</button>
+  </>
+)}
 
     {/* STEP 2 */}
     {step === 2 && (
