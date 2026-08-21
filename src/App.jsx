@@ -9,6 +9,7 @@ import ServiceSelection from "./components/ServiceSelection";
 import WashPriceSelection from "./components/WashPriceSelection";
 import Wash20Selection from "./components/Wash20Selection";
 import Wash30ProgramSelection from "./components/Wash30ProgramSelection";
+import Wash30Options from "./components/Wash30Options";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -345,160 +346,28 @@ setupMqttHandlers(client, {
   />
 )}
 
-    {/* STEP 2_2_1 (ซัก) */}
-    {step === 2_2_1 && mode === "wash" && (
-      <>
-<h2 style={{marginBottom: "10px"}}>
-  {programNameMap[program] ?? ""}
-</h2>
-
- <div style={{
-  border: "1px solid #e5e7eb",
-  padding: "20px",
-  borderRadius: "16px",
-  marginBottom: "20px",
-  background: "#ffffff",
-  boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
-}}>
-  <h3 style={{ marginBottom: "10px" }}>🧾 สรุปรายการ</h3>
-
-  <p>🧺 โปรแกรม: <b>{programNameMap[program] ?? "-"}</b></p>
-
-  <p>
-    🌡️ อุณหภูมิ:{" "}
-    <b>{tempOption ? tempOption + "°C" : "ปกติ"}</b>
-  </p>
-
-  <p>
-    🌸 Aroma: <b>{aromaOption ? "เพิ่ม" : "ไม่ใช้"}</b>
-  </p>
-
-  <hr style={{ margin: "10px 0" }} />
-
-  <h2 style={{ color: "#2563eb" }}>
-    รวม: {getTotalPrice()} บาท
-  </h2>
-</div>
-
-{/* 🔥 อุณหภูมิ (เลือกได้ตัวเดียว) */}
-{tempShowOptionsMap[program]?.map((tempShow)  => (
-  <label 
-  key={tempShow}  
-  style={{
-  display: "block",
-  padding: "8px",
-  borderRadius: "8px",
-}}>🌡️ เพิ่มอุณหภูมิ
-  </label>
-))}
-
-
-{tempOptionsMap[program]?.map((temp) => (
-  <label 
-  style={{
-  display: "block",
-  padding: "8px",
-  borderRadius: "8px",
-  background: tempOption === temp ? "#e0f2fe" : "transparent"
-}}
-key={temp}>
-    <input
-      type="checkbox"
-      checked={tempOption === temp}
-      onChange={() =>
-        setTempOption(tempOption === temp ? null : temp)
-      }
-    />
-    {temp}°C (+ {tempPriceMap[temp] ?? 0} บาท)  {/*// เดิม {temp}°C (+ {tempPriceMap[temp]} บาท) แต่ใส่ ?? 0 เพิ่มกันพลาดเผื่อไม่มีราคา*/}
-  </label>
-))}
-<br />
-
-{aromaOptionsMap[program]?.map((aroma) => (
-  
-  <label 
-  style={{
-  display: "block",
-  padding: "8px",
-  borderRadius: "8px",
-  background: aromaOption === aroma ? "#e0f2fe" : "transparent"
-}}
-
-
-key={aroma}>
-  {/* 🔥 Aroma (อิสระ) */}
-  <h3>เพิ่มความหอม</h3>
-    <input
-      type="checkbox"
-      checked={aromaOption === aroma}
-      onChange={() =>
-        setAromaOption(aromaOption === aroma ? null : aroma)
-      }
-    />
-    
-    {aroma}   {/*// เดิม {temp}°C (+ {tempPriceMap[temp]} บาท) แต่ใส่ ?? 0 เพิ่มกันพลาดเผื่อไม่มีราคา*/}
-  </label>
-))}
-
-        <br/>
-        <button onClick={() => {
-          resetOptions();
-          setProgram(0);                    
-          setStep(2_2)}}>ย้อนกลับ</button>
-
-      {/*  <button onClick={() => setStep(6)}>ต่อไป</button> */}
-
-<button 
-  style={{
-  width: "100%",
-  padding: "15px",
-  fontSize: "18px",
-  background: "#22c55e",
-  color: "white",
-  border: "none",
-  borderRadius: "12px",
-  cursor: "pointer",
-  marginTop: "10px"
-}}
-// onClick={() => {
-//   const cmd = buildCommand();
-//   console.log(cmd);
-
-//   if(!program){
-//     alert("กรุณาเลือกโปรแกรม");
-//     return;
-//   }
-//   if (!window.confirm(`ยืนยันชำระ ${getTotalPrice()} บาท ?`)) 
-//     return;
-//     //TODO ยิง MQTT หรือไปหน้า QR
-//     setStep(STEP_QR);
-//   // client.publish("laundry/cmd", JSON.stringify(cmd));
-// }}>
-
-onClick={async () => {
-  const cmd = buildCommand();
-  console.log(cmd);
-
-  if (!program) {
-    alert("กรุณาเลือกโปรแกรม");
-    return;
-  }
-
-  if (!window.confirm(`ยืนยันชำระ ${getTotalPrice()} บาท ?`)) {
-    return;
-  }
-
-  // ✅ เพิ่มตรงนี้
-  const ok = await checkMachineBeforePay();
-  if (!ok) return;
-
-  // ✅ ของเดิม
-  setStep(STEP_QR);
-}}>
-  ยืนยันและชำระเงิน</button>
-
-      </>
-    )}
+{/* STEP 2_2_1 (ซัก) */}
+{step === 2_2_1 && mode === "wash" && (
+  <Wash30Options
+    program={program}
+    programNameMap={programNameMap}
+    tempOption={tempOption}
+    setTempOption={setTempOption}
+    tempOptionsMap={tempOptionsMap}
+    tempShowOptionsMap={tempShowOptionsMap}
+    tempPriceMap={tempPriceMap}
+    aromaOption={aromaOption}
+    setAromaOption={setAromaOption}
+    aromaOptionsMap={aromaOptionsMap}
+    getTotalPrice={getTotalPrice}
+    resetOptions={resetOptions}
+    setProgram={setProgram}
+    setStep={setStep}
+    buildCommand={buildCommand}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
 
     {/* STEP 2_3 */}
     {step === 2_3 && (
