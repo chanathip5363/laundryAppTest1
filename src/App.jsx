@@ -8,6 +8,7 @@ import { calculateTotalPrice } from "./price/priceLogic";
 import ServiceSelection from "./components/ServiceSelection";
 import WashPriceSelection from "./components/WashPriceSelection";
 import Wash20Selection from "./components/Wash20Selection";
+import Wash30ProgramSelection from "./components/Wash30ProgramSelection";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -333,60 +334,16 @@ setupMqttHandlers(client, {
 )}
 
 
-    {/* STEP 2_2 */}
-    {step === 2_2 && (
-      <>
-        <h2>เลือกโปรแกรม</h2>
-
-        <button onClick={() => {
-          setProgram(1);
-          setProgramPrice(30);
-          setStep(2_2_1);
-        }}>ชุดกีฬา</button>
-
-        <button onClick={() => {
-          setProgram(2);
-          setProgramPrice(30);          
-          setStep(2_2_1);
-        }}>ผ้าขนสัตว์</button>
-
-        <button onClick={() => {
-          setProgram(3);
-          setProgramPrice(30);          
-          setStep(2_2_1);
-    }}>ผ้าบอบบาง</button>
-
-        <button onClick={() => {
-          setProgram(5);
-          setProgramPrice(30);          
-          setStep(2_2_1);
-        }}>ผ้าผสม 45 นาที</button>
-
-        <button onClick={() => {
-          setProgram(7);
-          setProgramPrice(30);          
-          setStep(2_2_1);
-        }}>ผ้าฝ้าย</button>
-
-        <button onClick={() => {
-          setProgram(8);
-          setProgramPrice(30);          
-          setStep(2_2_1);
-        }}>ผ้าขาว</button>
-
-        <button onClick={() => {
-          setProgram(9);
-          setProgramPrice(30);          
-          setStep(2_2_1);
-        }}>ซักถนอมสีผ้า</button>                        
-
-        <br />
-        <button onClick={() => {
-          resetOptions();           
-          setProgram(0);          
-          setStep(2)}}>ย้อนกลับ</button>
-      </>
-    )}
+{/* STEP 2_2 */}
+{step === 2_2 && (
+  <Wash30ProgramSelection
+    programNameMap={programNameMap}
+    setProgram={setProgram}
+    setProgramPrice={setProgramPrice}
+    setStep={setStep}
+    resetOptions={resetOptions}
+  />
+)}
 
     {/* STEP 2_2_1 (ซัก) */}
     {step === 2_2_1 && mode === "wash" && (
