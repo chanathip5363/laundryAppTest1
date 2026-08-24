@@ -12,6 +12,7 @@ import Wash30ProgramSelection from "./components/Wash30ProgramSelection";
 import Wash30Options from "./components/Wash30Options";
 import Wash50Selection from "./components/Wash50Selection";
 import Dry1Selection from "./components/Dry1Selection";
+import Dry2Selection from "./components/Dry2Selection";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -446,67 +447,14 @@ setupMqttHandlers(client, {
   />
 )}
 
-    {/* STEP 3_2 */}
-    {step === 3_2 && (
-      <>
-        <h2>เลือกราคา</h2>
-
-<div style={{ display: "flex", gap: "40px", alignItems: "flex-start", marginBottom: "20px"}}>       
-{/* ฝั่งขวา = รายละเอียด */}
-        <div style={{ width: "120px"}}>
-        <button onClick={() => {
-          setDry2Prices(40);
-          setDry2Program(1);
-        }}>40 บาท</button>
-   </div>
-
-<div style={{ marginBottom: "10px" }}>
-<h4>รายละเอียด<br />
-    - จำนวนผ้า 2 กก. หรือ 15 ชิ้น <br />
-    - ซักด่วน 15 นาที <br />    
-    - ซักแบบประหยัด</h4>
-   </div>
-  </div>
-
-<div style={{ display: "flex", gap: "40px", alignItems: "flex-start", marginBottom: "20px"}}>       
-{/* ฝั่งขวา = รายละเอียด */}
-        <div style={{ width: "120px"}}>
-        <button onClick={() => {
-          setDry2Prices(50);
-          setDry2Program(2);
-        }}>50 บาท</button>
-      </div>
-
-<div style={{ marginBottom: "10px" }}>
-<h4>รายละเอียด<br/>
-    - จำนวนผ้า 2 กก. หรือ 15 ชิ้น <br />
-    - Fast Dry 30 นาที <br />    
-    - ผ้าเนื้อบาง</h4>
-    </div>
-  </div>
-
-<div style={{ display: "flex", gap: "40px", alignItems: "flex-start", marginBottom: "20px"}}>       
-{/* ฝั่งขวา = รายละเอียด */}
-        <div style={{ width: "120px"}}>
-        <button onClick={() => {
-          setDry2Prices(60);
-          setDry2Program(3);
-        }}>60 บาท</button>
-      </div>
-
-<div style={{ marginBottom: "10px" }}>
-<h4>รายละเอียด<br/>
-    - จำนวนผ้า 2 กก. หรือ 15 ชิ้น <br />
-    - Fast Dry 30 นาที <br />    
-    - ผ้าเนื้อบาง</h4>
-    </div>
-  </div>
-
-        <br />
-        <button onClick={() => setStep(3)}>ย้อนกลับ</button>
-        <button onClick={() => setStep(6)}>ต่อไป</button>              
-      </>
-    )}    
+{/* STEP 3_2 */}
+{step === 3_2 && (
+  <Dry2Selection
+    setDry2Prices={setDry2Prices}
+    setDry2Program={setDry2Program}
+    setStep={setStep}
+  />
+)}
 
 
 {step === STEP_QR && (
