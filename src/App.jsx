@@ -13,6 +13,7 @@ import Wash30Options from "./components/Wash30Options";
 import Wash50Selection from "./components/Wash50Selection";
 import Dry1Selection from "./components/Dry1Selection";
 import Dry2Selection from "./components/Dry2Selection";
+import QRPayment from "./components/QRPayment";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -458,28 +459,15 @@ setupMqttHandlers(client, {
 
 
 {step === STEP_QR && (
-  <>
-    <h2>ชำระเงิน</h2>
-
-    <img
-      src={generateQR()}
-      alt="QR"
-      style={{ width: "250px" }}
-    />
-
-    <h2>{getTotalPrice()} บาท</h2>
-
-    <button onClick={() => {
-      alert("ชำระเงินสำเร็จ (จำลอง)");
-      setProgram(0);
-      setStep(1);
-      setProgramPrice(0);
-      resetOptions();
-      confirmWash();
-    }}>
-      จำลองจ่ายแล้ว
-    </button>
-  </>
+  <QRPayment
+    generateQR={generateQR}
+    getTotalPrice={getTotalPrice}
+    setProgram={setProgram}
+    setStep={setStep}
+    setProgramPrice={setProgramPrice}
+    resetOptions={resetOptions}
+    confirmWash={confirmWash}
+  />
 )}
   </div>
   );
