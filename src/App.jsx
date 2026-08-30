@@ -5,6 +5,7 @@ import { getAromaPulse } from "./utils/getAromaPulse";
 import { MQTT_TOPICS } from "./constants/mqttTopics";
 import { setupMqttHandlers } from "./mqtt/mqttHandlers";
 import { calculateTotalPrice } from "./price/priceLogic";
+import { calculateDryTotalPrice } from "./price/dryPriceLogic";
 import ServiceSelection from "./components/ServiceSelection";
 import WashPriceSelection from "./components/WashPriceSelection";
 import Wash20Selection from "./components/Wash20Selection";
@@ -12,8 +13,15 @@ import Wash30ProgramSelection from "./components/Wash30ProgramSelection";
 import Wash30Options from "./components/Wash30Options";
 import Wash50Selection from "./components/Wash50Selection";
 import Dry1Selection from "./components/Dry1Selection";
+import Dry1Options from "./components/Dry1Options";
 import Dry2Selection from "./components/Dry2Selection";
+import Dry2Options from "./components/Dry2Options";
+import Dry3Selection from "./components/Dry3Selection";
+import Dry3Options from "./components/Dry3Options";
+import WashMachineSelection from "./components/WashMachineSelection";
+import DryMachineSelection from "./components/DryMachineSelection";
 import QRPayment from "./components/QRPayment";
+import DrySelection from "./components/DrySelection";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -34,6 +42,7 @@ function App() {
 
 const [step, setStep] = useState(1);
 const [mode, setMode] = useState(null);
+const [selectedMachine, setSelectedMachine] = useState(null);
 const [basePrice, setBasePrice] = useState(0);
 
 const [modeTemp, setModeTemp] = useState(null);
@@ -55,6 +64,41 @@ const [dry1price, setDry1Prices] = useState({});
 const [dry1program, setDry1Program] = useState({});
 const [dry2price, setDry2Prices] = useState({});
 const [dry2program, setDry2Program] = useState({});
+const [dry3price, setDry3Prices] = useState({});
+const [dry3program, setDry3Program] = useState({});
+
+const [dry1TemperatureOption, setDry1TemperatureOption] = useState(null);
+const [dry1WrinkleOption, setDry1WrinkleOption] = useState(false);
+
+const [dry2TemperatureOption, setDry2TemperatureOption] = useState(null);
+const [dry2WrinkleOption, setDry2WrinkleOption] = useState(false);
+
+const [dry3TemperatureOption, setDry3TemperatureOption] = useState(null);
+const [dry3WrinkleOption, setDry3WrinkleOption] = useState(false);
+
+const getDry1TotalPrice = () => {
+  return calculateDryTotalPrice({
+    basePrice: dry1price,
+    temperatureOption: dry1TemperatureOption,
+    wrinkleOption: dry1WrinkleOption,
+  });
+};
+
+const getDry2TotalPrice = () => {
+  return calculateDryTotalPrice({
+    basePrice: dry2price,
+    temperatureOption: dry2TemperatureOption,
+    wrinkleOption: dry2WrinkleOption,
+  });
+};
+
+const getDry3TotalPrice = () => {
+  return calculateDryTotalPrice({
+    basePrice: dry3price,
+    temperatureOption: dry3TemperatureOption,
+    wrinkleOption: dry3WrinkleOption,
+  });
+};
 
 // 220369 15:00 เป็นค่าที่นำมาจากเครื่อง Toshiba 1:ชุดกีฬา 20/30/40 องศา 2:ผ้าขนสัตว์ 20/30/40 องศา 3:ผ้าบอบบาง 20/30/40 องศา 5:ผ้าผสม 20/30/40 องศา
 // 7:ผ้าฝ้าย 20/30/40 องศา 8:ผ้าขาว 20/30/40 องศา 9:ซักถนอนสีผ้า 20/30/40 องศา
@@ -93,7 +137,7 @@ const getTotalPrice = () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ machine: "machine1" }),
+      body: JSON.stringify({ machine: selectedMachine }),
     });
 
     const data = await res.json();
@@ -196,7 +240,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
       // - ถ้าใช้งานจริงค่อยเปลี่ยนเป็น Date.now() หรือ id จาก payment gateway
       const txid = "TX" + Date.now();
 
-      const machine = "machine1";
+      const machine = selectedMachine;
       // const priceMap = {
       //   1: 15,
       //   2: 15,
@@ -283,17 +327,37 @@ setupMqttHandlers(client, {
     <ServiceSelection
       onSelectWash={() => {
         setMode("wash");
-        setStep(2);
+        setSelectedMachine(null);
+        setStep(1_1);
       }}
       onSelectDry={() => {
         setMode("dry");
-        setStep(3);
+        setSelectedMachine(null);
+        setStep(1_2);
       }}
     />
 
     <br />
     <button onClick={finishWash}>ซักเสร็จ</button>
   </>
+)}
+
+{/* STEP 1_1 */}
+{step === 1_1 && (
+  <WashMachineSelection
+    selectedMachine={selectedMachine}
+    setSelectedMachine={setSelectedMachine}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 1_2 */}
+{step === 1_2 && (
+  <DryMachineSelection
+    selectedMachine={selectedMachine}
+    setSelectedMachine={setSelectedMachine}
+    setStep={setStep}
+  />
 )}
 
 {/* STEP 2 */}
@@ -316,7 +380,7 @@ setupMqttHandlers(client, {
       setProgramPrice(50);
     }}
 
-    onBack={() => setStep(1)}
+    onBack={() => setStep(1_1)}
   />
 )}
 
@@ -387,55 +451,14 @@ setupMqttHandlers(client, {
     STEP_QR={STEP_QR}
   />
 )}
-    {/* STEP 3 */}
-    {step === 3 && (
-      <>
-        <h2>เลือกระบบ</h2>
-
-<div style={{ display: "flex", gap: "40px", alignItems: "flex-start", marginBottom: "20px"}}>       
-{/* ฝั่งขวา = รายละเอียด */}
-        <div style={{ width: "120px"}}>
-        <button onClick={() => {
-          setProgram(4);
-          setStep(3_1);
-        }}>ลมร้อน</button>      </div>
-<div style={{ marginBottom: "10px" }}>
-<h4>รายละเอียด<br/>
-    - น้ำหนักผ้า 7-8 กก.<br/>
-    - ระบบลมร้อนใช้อุณหภูมิสูงในการอบผ้า<br/>
-    - เพื่อใหีประสิทธิภาพดีที่สุด ควรตรวจสอบกรองอากาศ ก่อนเริ่มใช้งาน<br/>
-    - ระยะเวลาที่แสดงหน้าจอตอนเริ่มทำงาน ~3:30 ชม. แต่ทำงานจริง ~80 ถึง 100 นาที<br/>
-    - เพราะว่าระบบมีการตรวจจับความชื้นอยู่เป็นระยะ จึงมีการคำนวณเวลาเสร็จอยู่ตลอด<br/>           
-    </h4>
-    </div>
-  </div>        
-
-<div style={{ display: "flex", gap: "40px", alignItems: "flex-start", marginBottom: "20px"}}>       
-{/* ฝั่งขวา = รายละเอียด */}
-        <div style={{ width: "120px"}}>
-        <button onClick={() => {
-          setProgram(4);
-          setStep(3_2);
-        }}>Heat Pump</button>
-      </div>
-<div style={{ marginBottom: "10px" }}>
-<h4>รายละเอียด<br/>
-    - น้ำหนักผ้า 7-8 กก.<br/>
-    - อบด้วยระบบควบแน้นที่อุณหภูมิต่ำ จึงช่วยถนอมผ้ามากขึ้น<br/>
-    - เพื่อใหีประสิทธิภาพดีที่สุด ควรตรวจสอบกรองอากาศ ก่อนเริ่มใช้งาน<br/>
-    - ระยะเวลา ~80 ถึง 120 นาที<br/>
-    </h4>
-    </div>
-  </div>        
-   
-    {/* <br /> */}
-        <button onClick={() => {
-          resetOptions();  
-          setProgram(0);                  
-          setStep(1)}}>ย้อนกลับ</button>
-
-      </>
-    )}
+{/* STEP 3 */}
+{step === 3 && (
+  <DrySelection
+    resetOptions={resetOptions}
+    setProgram={setProgram}
+    setStep={setStep}
+  />
+)}
 
 {/* STEP 3_1 */}
 {step === 3_1 && (
@@ -448,6 +471,21 @@ setupMqttHandlers(client, {
   />
 )}
 
+{/* STEP 3_1_1 */}
+{step === 3_1_1 && (
+  <Dry1Options
+    dry1price={dry1price}
+    dry1TemperatureOption={dry1TemperatureOption}
+    setDry1TemperatureOption={setDry1TemperatureOption}
+    dry1WrinkleOption={dry1WrinkleOption}
+    setDry1WrinkleOption={setDry1WrinkleOption}
+    getDry1TotalPrice={getDry1TotalPrice}
+    setStep={setStep}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+
 {/* STEP 3_2 */}
 {step === 3_2 && (
   <Dry2Selection
@@ -457,6 +495,46 @@ setupMqttHandlers(client, {
   />
 )}
 
+{/* STEP 3_2_1 */}
+{step === 3_2_1 && (
+  <Dry2Options
+    dry2price={dry2price}
+    dry2TemperatureOption={dry2TemperatureOption}
+    setDry2TemperatureOption={setDry2TemperatureOption}
+    dry2WrinkleOption={dry2WrinkleOption}
+    setDry2WrinkleOption={setDry2WrinkleOption}
+    getDry2TotalPrice={getDry2TotalPrice}
+    setStep={setStep}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+
+
+
+{/* STEP 3_3 */}
+{step === 3_3 && (
+  <Dry3Selection
+    setDry3Prices={setDry3Prices}
+    setDry3Program={setDry3Program}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_3_1 */}
+{step === 3_3_1 && (
+  <Dry3Options
+    dry3price={dry3price}
+    dry3TemperatureOption={dry3TemperatureOption}
+    setDry3TemperatureOption={setDry3TemperatureOption}
+    dry3WrinkleOption={dry3WrinkleOption}
+    setDry3WrinkleOption={setDry3WrinkleOption}
+    getDry3TotalPrice={getDry3TotalPrice}
+    setStep={setStep}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
 
 {step === STEP_QR && (
   <QRPayment

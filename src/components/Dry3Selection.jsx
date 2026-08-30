@@ -1,8 +1,6 @@
-function Dry1Selection({
-  setDry1Prices,
-  setDry1Program,
-  resetOptions,
-  setProgram,
+function Dry3Selection({
+  setDry3Prices,
+  setDry3Program,
   setStep,
 }) {
   return (
@@ -20,8 +18,8 @@ function Dry1Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry1Prices(25);
-              setDry1Program(1);
+              setDry3Prices(25);
+              setDry3Program(1);
             }}
           >
             25 บาท
@@ -52,8 +50,8 @@ function Dry1Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry1Prices(35);
-              setDry1Program(2);
+              setDry3Prices(35);
+              setDry3Program(2);
             }}
           >
             35 บาท
@@ -84,8 +82,8 @@ function Dry1Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry1Prices(45);
-              setDry1Program(3);
+              setDry3Prices(45);
+              setDry3Program(3);
             }}
           >
             45 บาท
@@ -107,19 +105,15 @@ function Dry1Selection({
 
       <br />
 
-      <button
-        onClick={() => {
-          resetOptions();
-          setProgram(0);
-          setStep(1_2);
-        }}
-      >
+      <button onClick={() => setStep(1_2)}>
         ย้อนกลับ
       </button>
 
-      <button onClick={() => setStep(3_1_1)}>ต่อไป</button>
+      <button onClick={() => setStep(3_3_1)}>
+        ต่อไป
+      </button>
     </>
   );
 }
 
-export default Dry1Selection;
+export default Dry3Selection;
