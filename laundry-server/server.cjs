@@ -160,6 +160,8 @@ app.post("/request-qr", (req, res) => {
   const { machine } = req.body;
   const now = Date.now();
 
+  console.log("[REQUEST QR] machine =", machine);
+
   db.get("SELECT * FROM machines WHERE machine = ?", [machine], (err, row) => {
 
     if(err) {

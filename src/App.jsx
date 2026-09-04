@@ -22,6 +22,7 @@ import WashMachineSelection from "./components/WashMachineSelection";
 import DryMachineSelection from "./components/DryMachineSelection";
 import QRPayment from "./components/QRPayment";
 import DrySelection from "./components/DrySelection";
+import getMachineConfig from "./config/getMachineConfig";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -43,6 +44,14 @@ function App() {
 const [step, setStep] = useState(1);
 const [mode, setMode] = useState(null);
 const [selectedMachine, setSelectedMachine] = useState(null);
+
+useEffect(() => {
+  if (selectedMachine) {
+    console.log("✅ SELECTED MACHINE:", selectedMachine);
+  }
+}, [selectedMachine]);
+
+const selectedMachineConfig = getMachineConfig(selectedMachine);
 const [basePrice, setBasePrice] = useState(0);
 
 const [modeTemp, setModeTemp] = useState(null);
@@ -175,7 +184,9 @@ const resetOptions = () => {  // เพื่อคืนค่าราคา�
 const buildCommand = () => {
   return {
     program: program,
-    tempPulse: getTempPulse(program, tempOption),
+    tempPulse: getTempPulse( 
+      program,  tempOption,  selectedMachineConfig
+    ),
     aromaPulse: getAromaPulse(aromaOption)
   };
 };
@@ -210,8 +221,8 @@ const [aromaSelected, setAromaSelected] = useState(null);
       console.log("MQTT Connected");
       setStatus("Connected");
 
-      mqtt.subscribe(MQTT_TOPICS.MACHINE1.STATE);
-      mqtt.subscribe(MQTT_TOPICS.MACHINE1.STATUS);
+      mqtt.subscribe("laundry/+/state");
+      mqtt.subscribe("laundry/+/status");
     });
 
     mqtt.on("message", (topic, message) => {
@@ -267,7 +278,11 @@ const [aromaSelected, setAromaSelected] = useState(null);
         txid,
         machine,
         program,
-        tempPulse: getTempPulse(program, tempOption),        
+        tempPulse: getTempPulse(
+          program,
+          tempOption,
+          selectedMachineConfig
+        ),        
         aromaPulse: getAromaPulse(aromaOption),         
         amount
       });
@@ -282,7 +297,11 @@ const [aromaSelected, setAromaSelected] = useState(null);
           machine,
           amount, 
           program,
-          tempPulse: getTempPulse(program, tempOption),
+        tempPulse: getTempPulse(
+          program,
+          tempOption,
+          selectedMachineConfig
+        ),
           aromaPulse: getAromaPulse(aromaOption)          
         })
       });
@@ -293,21 +312,16 @@ const [aromaSelected, setAromaSelected] = useState(null);
     }
   };
 
-  const finishWash = () => {
-    if (client) {
-      client.publish(MQTT_TOPICS.MACHINE1.FINISH, "done");
-      console.log("Finish pressed");
-      setStep(1);
-      setMode(null);
-    }
+const finishWash = (machine) => {
+  if (!client) return;
 
-client.subscribe(MQTT_TOPICS.MACHINE1.FINISH);
+  client.publish(`laundry/${machine}/finish`, "done");
 
-setupMqttHandlers(client, {
-  finishWash
-});
+  console.log("Finish pressed:", machine);
 
-  };
+  setStep(1);
+  setMode(null);
+};
 
 
 
@@ -338,7 +352,17 @@ setupMqttHandlers(client, {
     />
 
     <br />
-    <button onClick={finishWash}>ซักเสร็จ</button>
+<button onClick={() => finishWash("machine1")}>
+  ซักเสร็จ เครื่อง 1
+</button>
+
+<button onClick={() => finishWash("machine2")}>
+  ซักเสร็จ เครื่อง 2
+</button>
+
+<button onClick={() => finishWash("machine3")}>
+  ซักเสร็จ เครื่อง 3
+</button>
   </>
 )}
 
