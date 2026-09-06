@@ -3,6 +3,7 @@ export function calculateTotalPrice({
   tempOption,
   aromaOption,
   tempPriceMap,
+  aromaPrice = 5,
 }) {
 
   console.log("programPrice : ", programPrice);
@@ -24,7 +25,7 @@ export function calculateTotalPrice({
 
   // Aroma
   if (aromaOption) {
-    total += 5;
+    total += aromaPrice;
   }
 
 

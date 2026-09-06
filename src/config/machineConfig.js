@@ -1,4 +1,6 @@
 import toshibaA from "./configurations/toshibaA";
+import tclB from "./configurations/tclB";
+import lgC from "./configurations/lgC";
 
 const machineConfig = {
   machine1: {
@@ -8,15 +10,15 @@ const machineConfig = {
   },
 
   machine2: {
-    brand: "Toshiba",
-    model: "A",
-    config: toshibaA,
+    brand: "TCL",
+    model: "B",
+    config: tclB,
   },
 
   machine3: {
-    brand: "Toshiba",
-    model: "A",
-    config: toshibaA,
+    brand: "LG",
+    model: "C",
+    config: lgC,
   },
 };
 

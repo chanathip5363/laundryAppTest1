@@ -2,6 +2,11 @@ function Wash50Selection({
   program,
   programNameMap,
   getTotalPrice,
+
+  aromaOption,
+  setAromaOption,
+  aromaOptionsMap,
+
   resetOptions,
   setProgram,
   setStep,
@@ -34,12 +39,38 @@ function Wash50Selection({
           <b>{programNameMap[program] ?? "-"}</b>
         </p>
 
+        <p>
+          🌸 Aroma: <b>{aromaOption ? "เพิ่ม" : "ไม่ใช้"}</b>
+        </p>
+
         <hr style={{ margin: "10px 0" }} />
 
         <h2 style={{ color: "#2563eb" }}>
           รวม: {getTotalPrice()} บาท
         </h2>
       </div>
+
+{aromaOptionsMap[program]?.map((aroma) => (
+  <label
+    key={aroma}
+    style={{
+      display: "block",
+      marginBottom: "10px",
+      cursor: "pointer",
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={aromaOption === aroma}
+      onChange={() =>
+        setAromaOption(
+          aromaOption === aroma ? null : aroma
+        )
+      }
+    />{" "}
+    {aroma}
+  </label>
+))}
 
       <button
         onClick={() => {

@@ -29,8 +29,6 @@ import {
   aromaOptionsMap,
   programNameMap,
   tempPriceMap,
-  tempCycleMap,
-  defaultTempMap
 } from "./constants/laundryConfig";
 
 
@@ -52,6 +50,34 @@ useEffect(() => {
 }, [selectedMachine]);
 
 const selectedMachineConfig = getMachineConfig(selectedMachine);
+
+const configProgramNameMap =
+  selectedMachineConfig?.config?.programs
+    ? Object.fromEntries(
+        Object.entries(selectedMachineConfig.config.programs).map(
+          ([id, programData]) => [id, programData.name]
+        )
+      )
+    : programNameMap;
+
+const configTempPriceMap =
+  selectedMachineConfig?.config?.temperaturePrice
+    ?? tempPriceMap;
+const configAromaPrice =
+  selectedMachineConfig?.config?.aromaPrice ?? 5;
+
+const configAromaOptionsMap =
+  selectedMachineConfig?.config?.programs
+    ? Object.fromEntries(
+        Object.entries(selectedMachineConfig.config.programs)
+          .filter(([, programData]) => programData.aroma)
+          .map(([id]) => [
+            id,
+            [`เพิ่ม Aroma (+${configAromaPrice} บาท)`]
+          ])
+      )
+    : aromaOptionsMap;
+
 const [basePrice, setBasePrice] = useState(0);
 
 const [modeTemp, setModeTemp] = useState(null);
@@ -130,13 +156,13 @@ const STEP_QR = 99;
 
 const getTotalPrice = () => {
 
-  return calculateTotalPrice({
-    programPrice,
-    tempOption,
-    aromaOption,
-    tempPriceMap
-  });
-
+return calculateTotalPrice({
+  programPrice,
+  tempOption,
+  aromaOption,
+  tempPriceMap: configTempPriceMap,
+  aromaPrice: configAromaPrice
+});
 };
 
  const checkMachineBeforePay = async () => {
@@ -412,7 +438,7 @@ const finishWash = (machine) => {
 {step === 2_1 && (
   <Wash20Selection
     program={program}
-    programNameMap={programNameMap}
+    programNameMap={configProgramNameMap}
     getTotalPrice={getTotalPrice}
     setProgram={setProgram}
     setProgramPrice={setProgramPrice}
@@ -423,6 +449,9 @@ const finishWash = (machine) => {
     buildCommand={buildCommand}
     checkMachineBeforePay={checkMachineBeforePay}
     STEP_QR={STEP_QR}
+    priceGroupPrograms={
+      selectedMachineConfig?.config?.priceGroups?.[20] ?? [4, 6]
+    }
   />
 )}
 
@@ -430,7 +459,7 @@ const finishWash = (machine) => {
 {/* STEP 2_2 */}
 {step === 2_2 && (
   <Wash30ProgramSelection
-    programNameMap={programNameMap}
+    programNameMap={configProgramNameMap}
     setProgram={setProgram}
     setProgramPrice={setProgramPrice}
     setStep={setStep}
@@ -442,15 +471,15 @@ const finishWash = (machine) => {
 {step === 2_2_1 && mode === "wash" && (
   <Wash30Options
     program={program}
-    programNameMap={programNameMap}
+    programNameMap={configProgramNameMap}
     tempOption={tempOption}
     setTempOption={setTempOption}
     tempOptionsMap={tempOptionsMap}
     tempShowOptionsMap={tempShowOptionsMap}
-    tempPriceMap={tempPriceMap}
+    tempPriceMap={configTempPriceMap}
     aromaOption={aromaOption}
     setAromaOption={setAromaOption}
-    aromaOptionsMap={aromaOptionsMap}
+    aromaOptionsMap={configAromaOptionsMap}
     getTotalPrice={getTotalPrice}
     resetOptions={resetOptions}
     setProgram={setProgram}
@@ -465,8 +494,13 @@ const finishWash = (machine) => {
 {step === 2_3 && (
   <Wash50Selection
     program={program}
-    programNameMap={programNameMap}
+    programNameMap={configProgramNameMap}
     getTotalPrice={getTotalPrice}
+
+    aromaOption={aromaOption}
+    setAromaOption={setAromaOption}
+    aromaOptionsMap={configAromaOptionsMap}
+
     resetOptions={resetOptions}
     setProgram={setProgram}
     setStep={setStep}

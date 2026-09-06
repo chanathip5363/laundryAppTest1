@@ -11,6 +11,7 @@
   buildCommand,
   checkMachineBeforePay,
   STEP_QR,
+  priceGroupPrograms,
 }) {
   return (
     <>
@@ -48,27 +49,19 @@
         </h2>
       </div>
 
-      <button
-        onClick={() => {
-          setProgram(4);
-          setProgramPrice(20);
-          setSpin(0);
-          setAroma(0);
-        }}
-      >
-        ซักแบบประหยัด
-      </button>
-
-      <button
-        onClick={() => {
-          setProgram(6);
-          setProgramPrice(20);
-          setSpin(0);
-          setAroma(0);
-        }}
-      >
-        ซักด่วน 15 นาที
-      </button>
+{priceGroupPrograms.map((programId) => (
+  <button
+    key={programId}
+    onClick={() => {
+      setProgram(programId);
+      setProgramPrice(20);
+      setSpin(0);
+      setAroma(0);
+    }}
+  >
+    {programNameMap[programId]}
+  </button>
+))}
 
       <br />
 

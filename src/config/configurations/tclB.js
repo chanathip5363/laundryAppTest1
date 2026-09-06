@@ -1,8 +1,15 @@
-const toshibaA = {
-  brand: "Toshiba",
-  model: "A",
+const tclB = {
+  brand: "TCL",
+  model: "B",
   machineType: "wash",
-  aromaPrice: 5,
+
+  priceGroups: {
+    20: [6],
+    30: [1, 2, 3, 5, 7, 8, 9],
+    50: [10],
+  },
+
+  aromaPrice: 8,
 
   programs: {
     1: {
@@ -18,7 +25,7 @@ const toshibaA = {
       temperature: ["20", "30", "40"],
       defaultTemperature: "40",
       temperatureCycle: ["40", "40", "normal", "20", "30"],
-      aroma: false,
+      aroma: true,
     },
 
     3: {
@@ -26,7 +33,7 @@ const toshibaA = {
       temperature: ["20", "30", "40"],
       defaultTemperature: "30",
       temperatureCycle: ["30", "30", "40", "normal", "20"],
-      aroma: false,
+      aroma: true,
     },
 
     4: {
@@ -74,7 +81,7 @@ const toshibaA = {
       temperature: ["20", "30", "40"],
       defaultTemperature: "normal",
       temperatureCycle: ["normal", "normal"],
-      aroma: false,
+      aroma: true,
     },
 
     10: {
@@ -82,7 +89,7 @@ const toshibaA = {
       temperature: [],
       defaultTemperature: null,
       temperatureCycle: ["normal", "normal"],
-      aroma: false,
+      aroma: true,
     },
   },
 
@@ -101,4 +108,4 @@ const toshibaA = {
   },
 };
 
-export default toshibaA;
+export default tclB;
