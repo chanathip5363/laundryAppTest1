@@ -959,6 +959,7 @@ void reconnect() {
       )
     ) {
 
+      Serial.println("[MQTT] Reconnected OK");
 
       String programTopic =
         String("laundry/") +
@@ -977,6 +978,10 @@ void reconnect() {
         MACHINE_ID +
         "/reset";
 
+      String aromaTopic = String("laundry/") + MACHINE_ID + "/aromaPulse";
+
+      String tempTopic = String("laundry/") + MACHINE_ID + "/tempPulse";
+
 
       client.subscribe(
         programTopic.c_str()
@@ -992,9 +997,20 @@ void reconnect() {
         resetTopic.c_str()
       );
 
+      client.subscribe(aromaTopic.c_str());
+
+      client.subscribe(tempTopic.c_str());
 
     } else {
 
+  Serial.print("[MQTT] Failed, state = ");
+  Serial.println(client.state());
+
+  Serial.print("[WiFi] status = ");
+  Serial.println(WiFi.status());
+
+  Serial.print("[WiFi] RSSI = ");
+  Serial.println(WiFi.RSSI());
 
       delayloop(2000);
     }

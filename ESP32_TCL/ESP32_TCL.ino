@@ -976,6 +976,11 @@ void reconnect() {
         MACHINE_ID +
         "/reset";
 
+      String aromaTopic = String("laundry/") + MACHINE_ID + "/aromaPulse";
+
+      String tempTopic = String("laundry/") + MACHINE_ID + "/tempPulse";
+
+
 
       client.subscribe(
         programTopic.c_str()
@@ -991,7 +996,10 @@ void reconnect() {
         resetTopic.c_str()
       );
 
+      client.subscribe(aromaTopic.c_str());
 
+      client.subscribe(tempTopic.c_str());
+      
     } else {
 
 

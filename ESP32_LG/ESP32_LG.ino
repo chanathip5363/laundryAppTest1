@@ -77,7 +77,6 @@ int program = 0;
 
 byte pattern[16][5] = {
 
-
   {1,0,1,1,0}, // 12 - 4
   {1,0,1,1,1}, // 13 - 5
   {0,0,1,0,0}, // 8 - 0
@@ -978,6 +977,8 @@ void reconnect() {
         MACHINE_ID +
         "/reset";
 
+String aromaTopic = String("laundry/") + MACHINE_ID + "/aromaPulse";
+String tempTopic = String("laundry/") + MACHINE_ID + "/tempPulse";
 
       client.subscribe(
         programTopic.c_str()
@@ -993,6 +994,8 @@ void reconnect() {
         resetTopic.c_str()
       );
 
+client.subscribe(aromaTopic.c_str());
+client.subscribe(tempTopic.c_str());
 
     } else {
 
