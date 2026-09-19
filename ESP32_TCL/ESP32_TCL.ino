@@ -945,18 +945,26 @@ void reconnect() {
   while (!client.connected()) {
 
 
-    String clientID =
-      String("Laundry") +
-      MACHINE_ID;
+      String clientID =
+        String("Laundry") +
+        MACHINE_ID;
 
+      String statusTopic =
+        String("laundry/") +
+        MACHINE_ID +
+        "/status";
 
-    if (
-      client.connect(
-        clientID.c_str(),
-        mqtt_user,
-        mqtt_pass
-      )
-    ) {
+      if (
+        client.connect(
+          clientID.c_str(),
+          mqtt_user,
+          mqtt_pass,
+          statusTopic.c_str(),
+          0,
+          true,
+          "OFFLINE"
+        )
+      ) {
 
 
       String programTopic =

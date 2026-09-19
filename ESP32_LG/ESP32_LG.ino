@@ -946,19 +946,28 @@ void reconnect() {
   while (!client.connected()) {
 
 
-    String clientID =
-      String("Laundry") +
-      MACHINE_ID;
+      String clientID =
+        String("Laundry") +
+        MACHINE_ID;
 
+      String statusTopic =
+        String("laundry/") +
+        MACHINE_ID +
+        "/status";
 
-    if (
-      client.connect(
-        clientID.c_str(),
-        mqtt_user,
-        mqtt_pass
-      )
-    ) {
+      if (
+        client.connect(
+          clientID.c_str(),
+          mqtt_user,
+          mqtt_pass,
+          statusTopic.c_str(),
+          0,
+          true,
+          "OFFLINE"
+        )
+      ) {
 
+      Serial.println("[MQTT] Reconnected OK");
 
       String programTopic =
         String("laundry/") +
@@ -977,8 +986,10 @@ void reconnect() {
         MACHINE_ID +
         "/reset";
 
-String aromaTopic = String("laundry/") + MACHINE_ID + "/aromaPulse";
-String tempTopic = String("laundry/") + MACHINE_ID + "/tempPulse";
+      String aromaTopic = String("laundry/") + MACHINE_ID + "/aromaPulse";
+
+      String tempTopic = String("laundry/") + MACHINE_ID + "/tempPulse";
+
 
       client.subscribe(
         programTopic.c_str()
@@ -994,11 +1005,20 @@ String tempTopic = String("laundry/") + MACHINE_ID + "/tempPulse";
         resetTopic.c_str()
       );
 
-client.subscribe(aromaTopic.c_str());
-client.subscribe(tempTopic.c_str());
+      client.subscribe(aromaTopic.c_str());
+
+      client.subscribe(tempTopic.c_str());
 
     } else {
 
+  Serial.print("[MQTT] Failed, state = ");
+  Serial.println(client.state());
+
+  Serial.print("[WiFi] status = ");
+  Serial.println(WiFi.status());
+
+  Serial.print("[WiFi] RSSI = ");
+  Serial.println(WiFi.RSSI());
 
       delayloop(2000);
     }
