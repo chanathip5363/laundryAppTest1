@@ -41,6 +41,16 @@ const db = new sqlite3.Database("./database.db");
 });
 
 db.run(`
+  ALTER TABLE machines ADD COLUMN status TEXT DEFAULT 'OFFLINE'
+`, (err) => {
+  if (err) {
+    console.log("status column อาจมีอยู่แล้ว:", err.message);
+  } else {
+    console.log("เพิ่ม status column สำเร็จ");
+  }
+});
+
+db.run(`
 CREATE TABLE IF NOT EXISTS transactions (
     txid TEXT PRIMARY KEY,
     machine TEXT,
@@ -74,6 +84,20 @@ function isMachineRunning(machine, callback){
     });
 }
 
+function isMachineOnline(machine, callback) {
+    db.get(
+        "SELECT status FROM machines WHERE machine=?",
+        [machine],
+        (err, row) => {
+            if (err || !row) {
+                return callback(false);
+            }
+
+            callback(row.status === "ONLINE");
+        }
+    );
+}
+
 // ===== webhook จาก payment =====
 app.post("/webhook", (req, res) => {
   const { txid, machine, amount, program, tempPulse, aromaPulse } = req.body;
@@ -98,6 +122,19 @@ app.post("/webhook", (req, res) => {
       console.log("Duplicate TXID -> ignore");
       return res.sendStatus(200);
     }
+
+// เช็คว่า ESP ของเครื่องยัง ONLINE
+isMachineOnline(machine, (online) => {
+  if (!online) {
+    console.log("Machine OFFLINE -> reject payment");
+
+    db.run(
+      "INSERT INTO transactions VALUES (?,?,?,?)",
+      [txid, machine, amount, "REJECTED"]
+    );
+
+    return res.sendStatus(200);
+  }
 
     // 2. เช็คเครื่องว่าง
     isMachineRunning(machine, (running) => {
@@ -154,6 +191,7 @@ app.post("/webhook", (req, res) => {
       );
     });
   });
+  });
 });
 
 app.post("/request-qr", (req, res) => {
@@ -177,6 +215,10 @@ app.post("/request-qr", (req, res) => {
     if (row && row.state === "RESERVED" && row.reserved_until <= now) {
       db.run(`UPDATE machines SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
     }
+
+    if (row && row.status !== "ONLINE") {
+      return res.json({ success: false, message: "เครื่องออฟไลน์" });
+}
 
     if (row && row.state === "RESERVED" && row.reserved_until > now) {
       return res.json({ success: false, message: "เครื่องไม่ว่าง" });
@@ -213,20 +255,37 @@ client.on("message", (topic, message)=>{
 
     const msg = message.toString().trim().toUpperCase();
     const machine = topic.split("/")[1];
+    const type = topic.split("/")[2];
 
     console.log("TOPIC:", topic);
     console.log("RAW MSG:", msg);        
 
     console.log("Status:", machine, msg);
 
-    if(msg === "FINISH" || msg === "IDLE"){
+    if(type === "state" && (msg === "FINISH" || msg === "IDLE")){
         db.run(
           "UPDATE machines SET state=? WHERE machine=?",
           ["IDLE", machine]
         );
         console.log("Machine Set to IDLE:", machine)
     }
+
+    if(type === "state" && msg === "RUNNING"){
+    db.run(
+      "UPDATE machines SET state=? WHERE machine=?",
+      ["RUNNING", machine]
+    );
+    console.log("Machine Set to RUNNING:", machine)
+}
     
+if(type === "status" && (msg === "ONLINE" || msg === "OFFLINE")){
+    db.run(
+      "UPDATE machines SET status=? WHERE machine=?",
+      [msg, machine]
+    );
+    console.log("Machine Status:", machine, msg);
+}
+
 });
 
 // ===== start server =====
@@ -238,7 +297,7 @@ app.get("/machine-status/:machine", (req, res) => {
   const machine = req.params.machine;
 
   db.get(
-    "SELECT state FROM machines WHERE machine = ?",
+    "SELECT state, status FROM machines WHERE machine = ?",
     [machine],
     (err, row) => {
       if (err) {
@@ -252,8 +311,12 @@ app.get("/machine-status/:machine", (req, res) => {
       }
 
       // ว่าง = IDLE เท่านั้น
-      const available = row.state === "IDLE";
-      res.json({ available });
+      const available = row.state === "IDLE" && row.status === "ONLINE";
+      res.json({
+        available,
+        state: row.state,
+        status: row.status
+});
     }
   );
 });
