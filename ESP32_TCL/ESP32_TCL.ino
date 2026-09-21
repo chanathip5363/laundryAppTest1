@@ -517,7 +517,8 @@ void setup() {
 
       client.publish(
         statusTopic.c_str(),
-        "ONLINE"
+        "ONLINE",
+        true
       );
 
 
@@ -1200,7 +1201,8 @@ void loop() {
 
     client.publish(
       statusTopic.c_str(),
-      "ONLINE"
+      "ONLINE",
+      true
     );
 
 

@@ -257,9 +257,6 @@ client.on("message", (topic, message)=>{
     const machine = topic.split("/")[1];
     const type = topic.split("/")[2];
 
-    console.log("TOPIC:", topic);
-    console.log("RAW MSG:", msg);        
-
     console.log(`[${type.toUpperCase()}] ${machine} = ${msg}`);
 
     if(type === "state" && (msg === "FINISH" || msg === "IDLE")){
