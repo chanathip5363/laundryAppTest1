@@ -123,6 +123,38 @@ app.post("/webhook", (req, res) => {
       return res.sendStatus(200);
     }
 
+    // ตรวจว่าเครื่องถูกจองไว้ และ reservation ยังไม่หมดเวลา
+    db.get(
+      "SELECT state, reserved_until FROM machines WHERE machine=?",
+      [machine],
+      (err, machineRow) => {
+
+        if (err || !machineRow) {
+          console.log("Unknown machine -> reject payment");
+          return res.sendStatus(200);
+        }
+
+    // ไม่มี reservation ที่ถูกต้อง
+    if (
+      machineRow.state !== "RESERVED" ||
+      !machineRow.reserved_until
+    ) {
+      console.log("Reservation invalid -> reject payment");
+      return res.sendStatus(200);
+    }
+
+    // reservation หมดเวลา
+    if (machineRow.reserved_until <= Date.now()) {
+      console.log("Reservation expired -> reset machine to IDLE");
+
+      db.run(
+        "UPDATE machines SET state='IDLE', reserved_until=NULL WHERE machine=?",
+        [machine]
+      );
+
+      return res.sendStatus(200);
+    }  
+
 // เช็คว่า ESP ของเครื่องยัง ONLINE
 isMachineOnline(machine, (online) => {
   if (!online) {
@@ -192,6 +224,7 @@ isMachineOnline(machine, (online) => {
     });
   });
   });
+  });  
 });
 
 app.post("/request-qr", (req, res) => {
@@ -232,7 +265,7 @@ app.post("/request-qr", (req, res) => {
       return res.json({ success: false, message: "เครื่องไม่ว่าง" });
     }
 
-    const reservedUntil = now + 20000; // 20 วินาที
+    const reservedUntil = now + 120000; // 2 นาที
 
 if (row) {
   db.run(`
@@ -267,11 +300,11 @@ client.on("message", (topic, message)=>{
 
     console.log(`[${type.toUpperCase()}] ${machine} = ${msg}`);
 
-    if(type === "state" && (msg === "FINISH" || msg === "IDLE")){
-        db.run(
-          "UPDATE machines SET state=? WHERE machine=?",
-          ["IDLE", machine]
-        );
+  if(type === "state" && (msg === "FINISH" || msg === "IDLE")){
+    db.run(
+      "UPDATE machines SET state='IDLE', reserved_until=NULL WHERE machine=?",
+      [machine]
+    );
         console.log("Machine Set to IDLE:", machine)
     }
 
@@ -353,6 +386,30 @@ app.get("/fix", (req, res) => {
     res.json(rows);
   });
 });
+
+// ===== ล้าง reservation ที่หมดอายุอัตโนมัติ =====
+setInterval(() => {
+  const now = Date.now();
+
+  db.run(
+    `UPDATE machines
+     SET state = 'IDLE', reserved_until = NULL
+     WHERE state = 'RESERVED'
+       AND reserved_until IS NOT NULL
+       AND reserved_until <= ?`,
+    [now],
+    function (err) {
+      if (err) {
+        console.log("Reservation cleanup error:", err);
+        return;
+      }
+
+      if (this.changes > 0) {
+        console.log(`Expired reservation cleared: ${this.changes} machine(s)`);
+      }
+    }
+  );
+}, 1000);
 
 app.get("/fix-null-machine", (req, res) => {
   db.run("DELETE FROM machines WHERE machine IS NULL", function (err) {
