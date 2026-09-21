@@ -280,11 +280,12 @@ if (row) {
   `, [machine, reservedUntil]);
 }
 
-    return res.json({
-      success: true,
-      message: "จองเครื่องสำเร็จ",
-      qr: "TEMP_QR"
-    });
+  return res.json({
+    success: true,
+    message: "จองเครื่องสำเร็จ",
+    qr: "TEMP_QR",
+    reservedUntil: reservedUntil
+  });
 
   });
 });

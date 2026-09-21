@@ -42,6 +42,7 @@ function App() {
 const [step, setStep] = useState(1);
 const [mode, setMode] = useState(null);
 const [selectedMachine, setSelectedMachine] = useState(null);
+const [reservedUntil, setReservedUntil] = useState(null);
 
 useEffect(() => {
   if (selectedMachine) {
@@ -181,7 +182,7 @@ return calculateTotalPrice({
       alert(data.message || "เครื่องไม่ว่าง");
       return false;
     }
-
+    setReservedUntil(data.reservedUntil);
     return true;
 
   } catch (err) {
@@ -605,6 +606,7 @@ const finishWash = (machine) => {
     setProgramPrice={setProgramPrice}
     resetOptions={resetOptions}
     confirmWash={confirmWash}
+    reservedUntil={reservedUntil}
   />
 )}
   </div>
