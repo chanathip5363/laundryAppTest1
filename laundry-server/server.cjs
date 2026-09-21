@@ -207,6 +207,14 @@ app.post("/request-qr", (req, res) => {
       return res.json({success: false, message: "DB error"});
     }
 
+    if (!row) {
+      console.log("Unknown machine -> reject QR:", machine);
+      return res.json({
+        success: false,
+        message: "ไม่พบเครื่อง"
+      });
+}    
+
     if (row && (row.state === "RUNNING" || row.state === "STARTING")) {
       return res.json({ success: false, message: "เครื่องกำลังทำงาน" });
     }    
