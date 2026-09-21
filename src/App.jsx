@@ -252,7 +252,9 @@ const [aromaSelected, setAromaSelected] = useState(null);
     });
 
     mqtt.on("message", (topic, message) => {
-      console.log(topic + ":" + message.toString());
+      const parts = topic.split("/");
+      const type = parts[2]?.toUpperCase();
+      console.log(`[${type}] ${parts[1]} = ${message.toString()}`);
     });
 
     mqtt.on("error", (err) => {

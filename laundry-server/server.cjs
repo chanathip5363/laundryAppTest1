@@ -171,7 +171,7 @@ isMachineOnline(machine, (online) => {
               if (err){
                   console.log ("X UPDATE ERROR:", err);
                 } else {
-                 console.log("/ UPDATE RUNNING OK:", this.changes);
+                 console.log("UPDATE STARTING OK:", this.changes);
                 }
               }
             );
@@ -260,7 +260,7 @@ client.on("message", (topic, message)=>{
     console.log("TOPIC:", topic);
     console.log("RAW MSG:", msg);        
 
-    console.log("Status:", machine, msg);
+    console.log(`[${type.toUpperCase()}] ${machine} = ${msg}`);
 
     if(type === "state" && (msg === "FINISH" || msg === "IDLE")){
         db.run(
@@ -279,11 +279,28 @@ client.on("message", (topic, message)=>{
 }
     
 if(type === "status" && (msg === "ONLINE" || msg === "OFFLINE")){
-    db.run(
-      "UPDATE machines SET status=? WHERE machine=?",
-      [msg, machine]
+db.run(
+  "UPDATE machines SET status=? WHERE machine=?",
+  [msg, machine],
+  function(err) {
+    if (err) {
+      console.log("Status UPDATE ERROR:", err);
+      return;
+    }
+
+    db.get(
+      "SELECT state, status FROM machines WHERE machine=?",
+      [machine],
+      (err, row) => {
+        if (err || !row) return;
+
+        console.log(
+          `[MACHINE] ${machine} | STATUS=${row.status} | STATE=${row.state}`
+        );
+      }
     );
-    console.log("Machine Status:", machine, msg);
+  }
+);
 }
 
 });
