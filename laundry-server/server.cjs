@@ -80,7 +80,7 @@ function isMachineRunning(machine, callback){
         if(err || !row){
             return callback(false);
         }
-        callback(row.state === "RUNNING");
+        callback(row.state === "RUNNING" || row.state === "STARTING");
     });
 }
 
