@@ -301,13 +301,23 @@ client.on("message", (topic, message)=>{
 
     console.log(`[${type.toUpperCase()}] ${machine} = ${msg}`);
 
-  if(type === "state" && (msg === "FINISH" || msg === "IDLE")){
-    db.run(
-      "UPDATE machines SET state='IDLE', reserved_until=NULL WHERE machine=?",
-      [machine]
-    );
-        console.log("Machine Set to IDLE:", machine)
-    }
+if (type === "state" && msg === "FINISH") {
+  db.run(
+    "UPDATE machines SET state='IDLE', reserved_until=NULL WHERE machine=?",
+    [machine]
+  );
+  console.log("Machine Set to IDLE:", machine);
+}
+
+if (type === "state" && msg === "IDLE") {
+  db.run(
+    `UPDATE machines
+     SET state='IDLE', reserved_until=NULL
+     WHERE machine=?
+       AND state != 'RESERVED'`,
+    [machine]
+  );
+}
 
     if(type === "state" && msg === "RUNNING"){
     db.run(
