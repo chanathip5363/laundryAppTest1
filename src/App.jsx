@@ -64,6 +64,14 @@ const configProgramNameMap =
 const configTempPriceMap =
   selectedMachineConfig?.config?.temperaturePrice
     ?? tempPriceMap;
+const configTempOptionsMap =
+  selectedMachineConfig?.config?.programs
+    ? Object.fromEntries(
+        Object.entries(selectedMachineConfig.config.programs).map(
+          ([id, programData]) => [id, programData.temperature]
+        )
+      )
+    : tempOptionsMap;    
 const configAromaPrice =
   selectedMachineConfig?.config?.aromaPrice ?? 5;
 
@@ -392,6 +400,11 @@ const finishWash = (machine) => {
 <button onClick={() => finishWash("machine3")}>
   ซักเสร็จ เครื่อง 3
 </button>
+
+<button onClick={() => finishWash("machine4")}>
+  ซักเสร็จ เครื่อง 4
+</button>
+
   </>
 )}
 
@@ -477,7 +490,7 @@ const finishWash = (machine) => {
     programNameMap={configProgramNameMap}
     tempOption={tempOption}
     setTempOption={setTempOption}
-    tempOptionsMap={tempOptionsMap}
+    tempOptionsMap={configTempOptionsMap}
     tempShowOptionsMap={tempShowOptionsMap}
     tempPriceMap={configTempPriceMap}
     aromaOption={aromaOption}

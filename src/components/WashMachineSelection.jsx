@@ -25,6 +25,12 @@ function WashMachineSelection({
         เครื่องซัก 3
       </button>
 
+      <button
+        onClick={() => setSelectedMachine("machine4")}
+      >
+        เครื่องซัก 4
+      </button>      
+
       <br />
 
       <button
