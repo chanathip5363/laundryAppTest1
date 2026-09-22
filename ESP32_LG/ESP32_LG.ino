@@ -1199,27 +1199,34 @@ void loop() {
   // Heartbeat
   // ----------------------------------------------------
 
-  if (millis() - lastStatus > 30000) {
+if (millis() - lastStatus > 30000) {
 
+  String statusTopic =
+    String("laundry/") +
+    MACHINE_ID +
+    "/status";
 
-    String statusTopic =
-      String("laundry/") +
-      MACHINE_ID +
-      "/status";
+  client.publish(
+    statusTopic.c_str(),
+    "ONLINE",
+    true
+  );
 
+  String stateTopic =
+    String("laundry/") +
+    MACHINE_ID +
+    "/state";
 
-    client.publish(
-      statusTopic.c_str(),
-      "ONLINE",
-      true
-    );
+  client.publish(
+    stateTopic.c_str(),
+    machineState.c_str(),
+    true
+  );
 
+  Serial.println("[STATUS] ONLINE");
 
-    Serial.println("[STATUS] ONLINE");
-
-
-    lastStatus = millis();
-  }
+  lastStatus = millis();
+}
 
 
   // ----------------------------------------------------

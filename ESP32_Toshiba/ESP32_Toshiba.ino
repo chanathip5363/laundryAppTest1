@@ -1214,6 +1214,16 @@ void loop() {
       true
     );
 
+    String stateTopic =
+      String("laundry/") +
+      MACHINE_ID +
+      "/state";
+
+    client.publish(
+      stateTopic.c_str(),
+      machineState.c_str(),
+      true
+    );
 
     Serial.println("[STATUS] ONLINE");
 
