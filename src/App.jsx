@@ -104,7 +104,7 @@ const [temp, setTemp] = useState(null);
 const [spin, setSpin] = useState(null);
 const [aroma, setAroma] = useState(null);
 
-const [dry1price, setDry1Prices] = useState({});
+const [dry1price, setDry1Prices] = useState(0);
 const [dry1program, setDry1Program] = useState({});
 const [dry2price, setDry2Prices] = useState({});
 const [dry2program, setDry2Program] = useState({});
@@ -174,6 +174,14 @@ return calculateTotalPrice({
 });
 };
 
+const getPaymentTotal = () => {
+  if (mode === "dry" && selectedMachine === "machine5") {
+    return getDry1TotalPrice();
+  }
+
+  return getTotalPrice();
+};
+
  const checkMachineBeforePay = async () => {
   try {
     const res = await fetch("http://localhost:3000/request-qr", {
@@ -202,7 +210,7 @@ return calculateTotalPrice({
 
 
  const generateQR = () => {
-  const amount = getTotalPrice() || 0;
+  const amount = getPaymentTotal() || 0;
 
   const phone = "0909890860"; // 👈 ใส่เบอร์คุณตรงนี้
 
@@ -305,7 +313,23 @@ const [aromaSelected, setAromaSelected] = useState(null);
       //   13: 50,
       //   14: 50
       // };
-      const amount = getTotalPrice();// เดิม = priceMap[program];  // ก่อนหน้าใช้โค้ด const amount = priceMap[program] || 40; หมายถึง ถ้าไม่มีค่าใน mapPrice ใช้ค่า default นี้คือ 40
+
+    const paymentProgram =
+      mode === "dry" && selectedMachine === "machine5"
+        ? dry1program
+        : program;
+
+      const paymentTempPulse =
+  mode === "dry" && selectedMachine === "machine5"
+    ? 0
+    : getTempPulse(program, tempOption, selectedMachineConfig);
+
+      const paymentAromaPulse =
+        mode === "dry" && selectedMachine === "machine5"
+          ? 0
+          : getAromaPulse(aromaOption);
+
+        const amount = getPaymentTotal();// เดิม = priceMap[program];  // ก่อนหน้าใช้โค้ด const amount = priceMap[program] || 40; หมายถึง ถ้าไม่มีค่าใน mapPrice ใช้ค่า default นี้คือ 40
       // if(!amount){
       //   alert("โปรแกรมนี้ยังไม่ตั้งราคา");  // if นี้ ทำใหม่อีกแบบเลยคือยกเลิก default 40 เป็นว่าถ้ายังไม่กำหนดราคาก็ขึ้น "โปรแกรมนี้ยังไม่ตั้งราคา"
       //   return;
@@ -314,13 +338,9 @@ const [aromaSelected, setAromaSelected] = useState(null);
       console.log("Send webhook:", {
         txid,
         machine,
-        program,
-        tempPulse: getTempPulse(
-          program,
-          tempOption,
-          selectedMachineConfig
-        ),        
-        aromaPulse: getAromaPulse(aromaOption),         
+        program: paymentProgram,
+        tempPulse: paymentTempPulse,
+        aromaPulse: paymentAromaPulse,         
         amount
       });
 
@@ -329,18 +349,26 @@ const [aromaSelected, setAromaSelected] = useState(null);
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          txid,
-          machine,
-          amount, 
-          program,
-        tempPulse: getTempPulse(
-          program,
-          tempOption,
-          selectedMachineConfig
-        ),
-          aromaPulse: getAromaPulse(aromaOption)          
-        })
+        body: JSON.stringify(
+          mode === "dry"
+            ? {
+                txid,
+                machine,
+                amount,
+                type: "dry",
+                program: paymentProgram,
+                temperatureOption: dry1TemperatureOption,
+                wrinkleOption: dry1WrinkleOption,
+              }
+            : {
+                txid,
+                machine,
+                amount,
+                program: paymentProgram,
+                tempPulse: paymentTempPulse,
+                aromaPulse: paymentAromaPulse,
+              }
+        )
       });
 
       console.log("webhook status =", res.status, "txid =", txid);
@@ -404,6 +432,12 @@ const finishWash = (machine) => {
 <button onClick={() => finishWash("machine4")}>
   ซักเสร็จ เครื่อง 4
 </button>
+
+<p>
+<button onClick={() => finishWash("machine5")}>
+  อบเสร็จ เครื่อง 5
+</button>
+</p>
 
   </>
 )}
@@ -537,7 +571,8 @@ const finishWash = (machine) => {
 {/* STEP 3_1 */}
 {step === 3_1 && (
   <Dry1Selection
-    setDry1Prices={setDry1Prices}
+  dry1price={dry1price}  
+  setDry1Prices={setDry1Prices}
     setDry1Program={setDry1Program}
     resetOptions={resetOptions}
     setProgram={setProgram}
@@ -613,7 +648,7 @@ const finishWash = (machine) => {
 {step === STEP_QR && (
   <QRPayment
     generateQR={generateQR}
-    getTotalPrice={getTotalPrice}
+    getTotalPrice={getPaymentTotal}
     setProgram={setProgram}
     setStep={setStep}
     setProgramPrice={setProgramPrice}

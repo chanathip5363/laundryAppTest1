@@ -8,7 +8,7 @@ function DryMachineSelection({
       <h2>เลือกเครื่องอบ</h2>
 
       <button
-        onClick={() => setSelectedMachine("dry1")}
+        onClick={() => setSelectedMachine("machine5")}
       >
         เครื่องอบ 1
       </button>
@@ -43,7 +43,7 @@ function DryMachineSelection({
             return;
           }
 
-          if (selectedMachine === "dry1") {
+          if (selectedMachine === "machine5") {
             setStep(3_1);
           } else if (selectedMachine === "dry2") {
             setStep(3_2);

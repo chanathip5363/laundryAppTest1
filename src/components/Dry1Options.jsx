@@ -53,9 +53,27 @@ function Dry1Options({
         <h3>
           ราคาพื้นฐาน: {dry1price} บาท
           <br />
+
+          {dry1TemperatureOption === "normal" && (
+            <>อุณหภูมิ: ปกติ +0 บาท<br /></>
+          )}
+
+          {dry1TemperatureOption === "medium" && (
+            <>อุณหภูมิ: กลาง +5 บาท<br /></>
+          )}
+
+          {dry1TemperatureOption === "high" && (
+            <>อุณหภูมิ: สูง +10 บาท<br /></>
+          )}
+
+          {dry1WrinkleOption && (
+            <>ลดรอยยับ: +5 บาท<br /></>
+          )}
+
           ราคาส่วนเพิ่ม:{" "}
           {getDry1TotalPrice() - (dry1price || 0)} บาท
           <br />
+
           <strong>
             รวม: {getDry1TotalPrice()} บาท
           </strong>

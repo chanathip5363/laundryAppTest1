@@ -100,7 +100,17 @@ function isMachineOnline(machine, callback) {
 
 // ===== webhook จาก payment =====
 app.post("/webhook", (req, res) => {
-  const { txid, machine, amount, program, tempPulse, aromaPulse } = req.body;
+  const {
+  txid,
+  machine,
+  amount,
+  type,
+  program,
+  tempPulse,
+  aromaPulse,
+  temperatureOption,
+  wrinkleOption
+} = req.body;
   console.log("Payment received:", txid);
   console.log("🔥🔥🔥 WEBHOOK HIT:", req.body);
 
@@ -214,9 +224,46 @@ isMachineOnline(machine, (online) => {
             program: program
           });
 
-          client.publish(`laundry/${machine}/tempPulse`, String(tempPulse || 0));          
-          client.publish(`laundry/${machine}/aromaPulse`, String(aromaPulse || 0));          
-          client.publish(`laundry/${machine}/program`, program.toString());          
+  if (type === "dry") {
+    client.publish(
+      `laundry/${machine}/temperatureOption`,
+      String(temperatureOption)
+    );
+
+    client.publish(
+      `laundry/${machine}/wrinkleOption`,
+      String(wrinkleOption)
+    );
+
+    client.publish(
+      `laundry/${machine}/program`,
+      program.toString()
+    );
+
+    console.log("DRY command:", {
+      machine,
+      program,
+      temperatureOption,
+      wrinkleOption
+    });
+
+  } else {
+    // Wash เดิม
+    client.publish(
+      `laundry/${machine}/tempPulse`,
+      String(tempPulse || 0)
+    );
+
+    client.publish(
+      `laundry/${machine}/aromaPulse`,
+      String(aromaPulse || 0)
+    );
+
+    client.publish(
+      `laundry/${machine}/program`,
+      program.toString()
+    );
+  }         
           console.log("Start machine:", machine);
           return res.sendStatus(200);
         }

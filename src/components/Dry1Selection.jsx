@@ -1,4 +1,5 @@
 function Dry1Selection({
+  dry1price,
   setDry1Prices,
   setDry1Program,
   resetOptions,
@@ -117,7 +118,18 @@ function Dry1Selection({
         ย้อนกลับ
       </button>
 
-      <button onClick={() => setStep(3_1_1)}>ต่อไป</button>
+      <button
+        onClick={() => {
+          if (!dry1price) {
+            alert("กรุณาเลือกราคา");
+            return;
+          }
+
+          setStep(3_1_1);
+        }}
+      >
+        ต่อไป
+      </button>    
     </>
   );
 }
