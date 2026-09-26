@@ -125,6 +125,7 @@ const getDry1TotalPrice = () => {
     basePrice: dry1price,
     temperatureOption: dry1TemperatureOption,
     wrinkleOption: dry1WrinkleOption,
+    dryerType: "dry1",
   });
 };
 

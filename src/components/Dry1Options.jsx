@@ -16,23 +16,23 @@ function Dry1Options({
       <div style={{ marginBottom: "20px" }}>
         <h4>อุณหภูมิการอบ</h4>
 
-        <button
-          onClick={() => setDry1TemperatureOption("normal")}
-        >
-          ปกติ +0 บาท
-        </button>
+      <button
+        onClick={() => setDry1TemperatureOption("airing")}
+      >
+        Airing +0 บาท
+      </button>
 
-        <button
-          onClick={() => setDry1TemperatureOption("medium")}
-        >
-          กลาง +5 บาท
-        </button>
+      <button
+        onClick={() => setDry1TemperatureOption("normal")}
+      >
+        Normal Dry +5 บาท
+      </button>
 
-        <button
-          onClick={() => setDry1TemperatureOption("high")}
-        >
-          สูง +10 บาท
-        </button>
+      <button
+        onClick={() => setDry1TemperatureOption("extra")}
+      >
+        Extra Dry +10 บาท
+      </button>
       </div>
 
       <div style={{ marginBottom: "20px" }}>
@@ -54,21 +54,17 @@ function Dry1Options({
           ราคาพื้นฐาน: {dry1price} บาท
           <br />
 
-          {dry1TemperatureOption === "normal" && (
-            <>อุณหภูมิ: ปกติ +0 บาท<br /></>
-          )}
+{dry1TemperatureOption === "airing" && (
+  <>อุณหภูมิ: Airing +0 บาท<br /></>
+)}
 
-          {dry1TemperatureOption === "medium" && (
-            <>อุณหภูมิ: กลาง +5 บาท<br /></>
-          )}
+{dry1TemperatureOption === "normal" && (
+  <>อุณหภูมิ: Normal Dry +5 บาท<br /></>
+)}
 
-          {dry1TemperatureOption === "high" && (
-            <>อุณหภูมิ: สูง +10 บาท<br /></>
-          )}
-
-          {dry1WrinkleOption && (
-            <>ลดรอยยับ: +5 บาท<br /></>
-          )}
+{dry1TemperatureOption === "extra" && (
+  <>อุณหภูมิ: Extra Dry +10 บาท<br /></>
+)}
 
           ราคาส่วนเพิ่ม:{" "}
           {getDry1TotalPrice() - (dry1price || 0)} บาท
