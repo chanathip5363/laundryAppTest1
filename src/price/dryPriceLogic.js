@@ -1,5 +1,6 @@
 export function calculateDryTotalPrice({
   basePrice,
+  program,
   temperatureOption,
   wrinkleOption,
   dryerType,
@@ -8,12 +9,15 @@ export function calculateDryTotalPrice({
 
   // TCL Dry1
   if (dryerType === "dry1") {
-    if (temperatureOption === "normal") {
-      total += 5;
-    }
+    // Program 1-7 สามารถปรับอุณหภูมิได้
+    if (program >= 1 && program <= 7) {
+      if (temperatureOption === "normal") {
+        total += 5;
+      }
 
-    if (temperatureOption === "extra") {
-      total += 10;
+      if (temperatureOption === "extra") {
+        total += 10;
+      }
     }
   }
 

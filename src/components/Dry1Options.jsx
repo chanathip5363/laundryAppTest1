@@ -1,5 +1,6 @@
 function Dry1Options({
   dry1price,
+  dry1program,
   dry1TemperatureOption,
   setDry1TemperatureOption,
   dry1WrinkleOption,
@@ -13,27 +14,37 @@ function Dry1Options({
     <>
       <h2>เลือก Option</h2>
 
-      <div style={{ marginBottom: "20px" }}>
-        <h4>อุณหภูมิการอบ</h4>
+{dry1program >= 1 && dry1program <= 7 && (
+  
+        <div style={{ marginBottom: "20px" }}>
+          <h4>อุณหภูมิการอบ</h4>
 
-      <button
-        onClick={() => setDry1TemperatureOption("airing")}
-      >
-        Airing +0 บาท
-      </button>
+          <button
+            onClick={() => setDry1TemperatureOption("airing")}
+          >
+            Airing +0 บาท
+          </button>
 
-      <button
-        onClick={() => setDry1TemperatureOption("normal")}
-      >
-        Normal Dry +5 บาท
-      </button>
+          <button
+            onClick={() => setDry1TemperatureOption("normal")}
+          >
+            Normal Dry +5 บาท
+          </button>
 
-      <button
-        onClick={() => setDry1TemperatureOption("extra")}
-      >
-        Extra Dry +10 บาท
-      </button>
-      </div>
+          <button
+            onClick={() => setDry1TemperatureOption("extra")}
+          >
+            Extra Dry +10 บาท
+          </button>
+        </div>
+      )}
+
+      {dry1program >= 8 && dry1program <= 12 && (
+        <div style={{ marginBottom: "20px" }}>
+          <h4>อุณหภูมิการอบ</h4>
+          <p>โปรแกรมนี้ไม่สามารถปรับอุณหภูมิได้</p>
+        </div>
+      )}
 
       <div style={{ marginBottom: "20px" }}>
         <h4>ลดรอยยับ</h4>
@@ -80,7 +91,7 @@ function Dry1Options({
           onClick={() => {
             setDry1TemperatureOption(null);
             setDry1WrinkleOption(false);
-            setStep(3_1);
+            setStep(3_1_1);
           }}
         >
         ย้อนกลับ
@@ -104,7 +115,11 @@ function Dry1Options({
             return;
           }
 
-          if (!dry1TemperatureOption) {
+          if (
+            dry1program >= 1 &&
+            dry1program <= 7 &&
+            !dry1TemperatureOption
+          ) {
             alert("กรุณาเลือกอุณหภูมิ");
             return;
           }

@@ -650,20 +650,17 @@ if (selectorMoving) {
 // ======================================================
 
 void startMachine() {
+  Serial.println("TCL START");
 
+  digitalWrite(START_PIN, HIGH);
+  Serial.println("START Pulse ON");
+  delayloop(800);
 
-Serial.println("TCL START");
+  digitalWrite(START_PIN, LOW);
+  Serial.println("START Pulse OFF");
+  delayloop(1000);
 
-digitalWrite(START_PIN, HIGH);
-
-delayloop(800);
-
-digitalWrite(START_PIN, LOW);
-
-delayloop(1000);
-
-Serial.println("TCL START PRESSED");
-
+  Serial.println("TCL START PRESSED");
 
   machineState = "RUNNING";
 
@@ -709,16 +706,14 @@ Serial.println("TCL START PRESSED");
 // ======================================================
 
 void powerOnDryer() {
-
   Serial.println("TCL POWER ON");
 
   digitalWrite(POWER_PIN, HIGH);
-
+  Serial.println("POWER Pulse ON");
   delayloop(800);
 
   digitalWrite(POWER_PIN, LOW);
-
-  // รอหน้าเครื่องเปิดและกลับมาที่ Program 1
+  Serial.println("POWER Pulse OFF");
   delayloop(2000);
 
   Serial.println("TCL READY - PROGRAM 1");
@@ -730,22 +725,29 @@ void powerOnDryer() {
 // ======================================================
 
 void stepRight() {
+  Serial.println("ROTARY RIGHT START");
 
   digitalWrite(ENCODER_A_PIN, HIGH);
   digitalWrite(ENCODER_B_PIN, LOW);
+  Serial.println("A=HIGH B=LOW");
   delayloop(500);
 
   digitalWrite(ENCODER_A_PIN, HIGH);
   digitalWrite(ENCODER_B_PIN, HIGH);
+  Serial.println("A=HIGH B=HIGH");
   delayloop(500);
 
   digitalWrite(ENCODER_A_PIN, LOW);
   digitalWrite(ENCODER_B_PIN, HIGH);
+  Serial.println("A=LOW  B=HIGH");
   delayloop(500);
 
   digitalWrite(ENCODER_A_PIN, LOW);
   digitalWrite(ENCODER_B_PIN, LOW);
+  Serial.println("A=LOW  B=LOW");
   delayloop(500);
+
+  Serial.println("ROTARY RIGHT DONE");
 }
 
 
@@ -755,22 +757,29 @@ void stepRight() {
 // ======================================================
 
 void stepLeft() {
+  Serial.println("ROTARY LEFT START");
 
   digitalWrite(ENCODER_A_PIN, LOW);
   digitalWrite(ENCODER_B_PIN, HIGH);
+  Serial.println("A=LOW  B=HIGH");
   delayloop(500);
 
   digitalWrite(ENCODER_A_PIN, HIGH);
   digitalWrite(ENCODER_B_PIN, HIGH);
+  Serial.println("A=HIGH B=HIGH");
   delayloop(500);
 
   digitalWrite(ENCODER_A_PIN, HIGH);
   digitalWrite(ENCODER_B_PIN, LOW);
+  Serial.println("A=HIGH B=LOW");
   delayloop(500);
 
   digitalWrite(ENCODER_A_PIN, LOW);
   digitalWrite(ENCODER_B_PIN, LOW);
+  Serial.println("A=LOW  B=LOW");
   delayloop(500);
+
+  Serial.println("ROTARY LEFT DONE");
 }
 
 // ======================================================
@@ -836,11 +845,12 @@ void selectProgram(int targetProgram) {
 // ======================================================
 
 void pressTempButton() {
-
   digitalWrite(TEMP_PIN, HIGH);
+  Serial.println("TEMP Pulse ON");
   delayloop(800);
 
   digitalWrite(TEMP_PIN, LOW);
+  Serial.println("TEMP Pulse OFF");
   delayloop(1000);
 }
 
@@ -887,20 +897,20 @@ void setTemperature(int targetProgram, String option) {
 // ======================================================
 
 void setAntiCrease(bool enabled) {
-
   Serial.print("ANTI CREASE = ");
   Serial.println(enabled ? "ON" : "OFF");
 
-  // ค่าเริ่มต้นของเครื่อง = OFF
   if (!enabled) {
-    Serial.println("ANTI CREASE OFF - NO PRESS");
+    Serial.println("ANTI CREASE OFF - NO PULSE");
     return;
   }
 
   digitalWrite(ANTI_CREASE_PIN, HIGH);
+  Serial.println("ANTI CREASE Pulse ON");
   delayloop(800);
 
   digitalWrite(ANTI_CREASE_PIN, LOW);
+  Serial.println("ANTI CREASE Pulse OFF");
   delayloop(1000);
 
   Serial.println("ANTI CREASE ON");

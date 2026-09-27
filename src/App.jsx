@@ -13,6 +13,7 @@ import Wash30ProgramSelection from "./components/Wash30ProgramSelection";
 import Wash30Options from "./components/Wash30Options";
 import Wash50Selection from "./components/Wash50Selection";
 import Dry1Selection from "./components/Dry1Selection";
+import Dry1ProgramSelection from "./components/Dry1ProgramSelection";
 import Dry1Options from "./components/Dry1Options";
 import Dry2Selection from "./components/Dry2Selection";
 import Dry2Options from "./components/Dry2Options";
@@ -105,7 +106,7 @@ const [spin, setSpin] = useState(null);
 const [aroma, setAroma] = useState(null);
 
 const [dry1price, setDry1Prices] = useState(0);
-const [dry1program, setDry1Program] = useState({});
+const [dry1program, setDry1Program] = useState(0);
 const [dry2price, setDry2Prices] = useState({});
 const [dry2program, setDry2Program] = useState({});
 const [dry3price, setDry3Prices] = useState({});
@@ -123,6 +124,7 @@ const [dry3WrinkleOption, setDry3WrinkleOption] = useState(false);
 const getDry1TotalPrice = () => {
   return calculateDryTotalPrice({
     basePrice: dry1price,
+    program: dry1program,
     temperatureOption: dry1TemperatureOption,
     wrinkleOption: dry1WrinkleOption,
     dryerType: "dry1",
@@ -572,8 +574,8 @@ const finishWash = (machine) => {
 {/* STEP 3_1 */}
 {step === 3_1 && (
   <Dry1Selection
-  dry1price={dry1price}  
-  setDry1Prices={setDry1Prices}
+    dry1price={dry1price}
+    setDry1Prices={setDry1Prices}
     setDry1Program={setDry1Program}
     resetOptions={resetOptions}
     setProgram={setProgram}
@@ -583,8 +585,20 @@ const finishWash = (machine) => {
 
 {/* STEP 3_1_1 */}
 {step === 3_1_1 && (
+  <Dry1ProgramSelection
+    dry1price={dry1price}
+    setDry1Program={setDry1Program}
+    setDry1TemperatureOption={setDry1TemperatureOption}
+    setDry1WrinkleOption={setDry1WrinkleOption}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_1_2 */}
+{step === 3_1_2 && (
   <Dry1Options
     dry1price={dry1price}
+    dry1program={dry1program}
     dry1TemperatureOption={dry1TemperatureOption}
     setDry1TemperatureOption={setDry1TemperatureOption}
     dry1WrinkleOption={dry1WrinkleOption}

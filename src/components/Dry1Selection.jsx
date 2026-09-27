@@ -22,7 +22,7 @@ function Dry1Selection({
           <button
             onClick={() => {
               setDry1Prices(25);
-              setDry1Program(1);
+              setDry1Program(0);
             }}
           >
             25 บาท
@@ -54,7 +54,7 @@ function Dry1Selection({
           <button
             onClick={() => {
               setDry1Prices(35);
-              setDry1Program(2);
+              setDry1Program(0);
             }}
           >
             35 บาท
@@ -86,7 +86,7 @@ function Dry1Selection({
           <button
             onClick={() => {
               setDry1Prices(45);
-              setDry1Program(3);
+              setDry1Program(0);
             }}
           >
             45 บาท
