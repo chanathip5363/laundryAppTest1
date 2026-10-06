@@ -16,6 +16,7 @@ import Dry1Selection from "./components/Dry1Selection";
 import Dry1ProgramSelection from "./components/Dry1ProgramSelection";
 import Dry1Options from "./components/Dry1Options";
 import Dry2Selection from "./components/Dry2Selection";
+import Dry2ProgramSelection from "./components/Dry2ProgramSelection";
 import Dry2Options from "./components/Dry2Options";
 import Dry3Selection from "./components/Dry3Selection";
 import Dry3Options from "./components/Dry3Options";
@@ -136,6 +137,7 @@ const getDry2TotalPrice = () => {
     basePrice: dry2price,
     temperatureOption: dry2TemperatureOption,
     wrinkleOption: dry2WrinkleOption,
+    dryerType: "dry2",
   });
 };
 
@@ -182,8 +184,13 @@ const getPaymentTotal = () => {
     return getDry1TotalPrice();
   }
 
+  if (mode === "dry" && selectedMachine === "machine6") {
+    return getDry2TotalPrice();
+  }
+
   return getTotalPrice();
 };
+
 
  const checkMachineBeforePay = async () => {
   try {
@@ -317,10 +324,13 @@ const [aromaSelected, setAromaSelected] = useState(null);
       //   14: 50
       // };
 
-    const paymentProgram =
-      mode === "dry" && selectedMachine === "machine5"
-        ? dry1program
-        : program;
+      const paymentProgram =
+        mode === "dry" && selectedMachine === "machine5"
+          ? dry1program
+          : mode === "dry" && selectedMachine === "machine6"
+          ? dry2program
+          : program;
+
 
       const paymentTempPulse =
   mode === "dry" && selectedMachine === "machine5"
@@ -360,8 +370,16 @@ const [aromaSelected, setAromaSelected] = useState(null);
                 amount,
                 type: "dry",
                 program: paymentProgram,
-                temperatureOption: dry1TemperatureOption,
-                wrinkleOption: dry1WrinkleOption,
+                temperatureOption:
+                  selectedMachine === "machine6"
+                    ? dry2TemperatureOption
+                    : dry1TemperatureOption,
+
+                wrinkleOption:
+                  selectedMachine === "machine6"
+                    ? dry2WrinkleOption
+                    : dry1WrinkleOption,
+
               }
             : {
                 txid,
@@ -436,11 +454,15 @@ const finishWash = (machine) => {
   ซักเสร็จ เครื่อง 4
 </button>
 
-<p>
+    <br />
 <button onClick={() => finishWash("machine5")}>
-  อบเสร็จ เครื่อง 5
+  อบเสร็จ เครื่อง 1
 </button>
-</p>
+
+
+<button onClick={() => finishWash("machine6")}>
+  อบเสร็จ เครื่อง 2
+</button>
 
   </>
 )}
@@ -621,8 +643,20 @@ const finishWash = (machine) => {
 
 {/* STEP 3_2_1 */}
 {step === 3_2_1 && (
+  <Dry2ProgramSelection
+    dry2price={dry2price}
+    setDry2Program={setDry2Program}
+    setDry2TemperatureOption={setDry2TemperatureOption}
+    setDry2WrinkleOption={setDry2WrinkleOption}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_2_2 */}
+{step === 3_2_2 && (
   <Dry2Options
     dry2price={dry2price}
+    dry2program={dry2program}
     dry2TemperatureOption={dry2TemperatureOption}
     setDry2TemperatureOption={setDry2TemperatureOption}
     dry2WrinkleOption={dry2WrinkleOption}
@@ -633,7 +667,6 @@ const finishWash = (machine) => {
     STEP_QR={STEP_QR}
   />
 )}
-
 
 
 {/* STEP 3_3 */}

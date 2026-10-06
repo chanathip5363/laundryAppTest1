@@ -8,28 +8,41 @@ function WashMachineSelection({
       <h2>เลือกเครื่องซัก</h2>
 
       <button
-        onClick={() => setSelectedMachine("machine1")}
-      >
-        เครื่องซัก 1
-      </button>
+      onClick={() => {
+        setSelectedMachine("machine1");
+        setStep(2);
+      }}
+    >
+      เครื่องซัก 1
+    </button>
 
-      <button
-        onClick={() => setSelectedMachine("machine2")}
-      >
-        เครื่องซัก 2
-      </button>
+    <button
+      onClick={() => {
+        setSelectedMachine("machine2");
+        setStep(2);
+      }}
+    >
+      เครื่องซัก 2
+    </button>
 
-      <button
-        onClick={() => setSelectedMachine("machine3")}
-      >
-        เครื่องซัก 3
-      </button>
+    <button
+      onClick={() => {
+        setSelectedMachine("machine3");
+        setStep(2);
+      }}
+    >
+      เครื่องซัก 3
+    </button>
 
-      <button
-        onClick={() => setSelectedMachine("machine4")}
-      >
-        เครื่องซัก 4
-      </button>      
+    <button
+      onClick={() => {
+        setSelectedMachine("machine4");
+        setStep(2);
+      }}
+    >
+      เครื่องซัก 4
+    </button>
+   
 
       <br />
 
@@ -42,18 +55,6 @@ function WashMachineSelection({
         ย้อนกลับ
       </button>
 
-      <button
-        onClick={() => {
-          if (!selectedMachine) {
-            alert("กรุณาเลือกเครื่องซัก");
-            return;
-          }
-
-          setStep(2);
-        }}
-      >
-        ต่อไป
-      </button>
     </>
   );
 }

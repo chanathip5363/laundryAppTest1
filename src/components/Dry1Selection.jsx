@@ -23,6 +23,7 @@ function Dry1Selection({
             onClick={() => {
               setDry1Prices(25);
               setDry1Program(0);
+              setStep(3_1_1);
             }}
           >
             25 บาท
@@ -55,6 +56,7 @@ function Dry1Selection({
             onClick={() => {
               setDry1Prices(35);
               setDry1Program(0);
+              setStep(3_1_1);
             }}
           >
             35 บาท
@@ -87,6 +89,7 @@ function Dry1Selection({
             onClick={() => {
               setDry1Prices(45);
               setDry1Program(0);
+              setStep(3_1_1);
             }}
           >
             45 บาท
@@ -118,18 +121,6 @@ function Dry1Selection({
         ย้อนกลับ
       </button>
 
-      <button
-        onClick={() => {
-          if (!dry1price) {
-            alert("กรุณาเลือกราคา");
-            return;
-          }
-
-          setStep(3_1_1);
-        }}
-      >
-        ต่อไป
-      </button>    
     </>
   );
 }

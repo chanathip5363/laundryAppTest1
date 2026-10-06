@@ -1,35 +1,30 @@
-function Dry1ProgramSelection({
-  dry1price,
-  setDry1Program,
-  setDry1TemperatureOption,
-  setDry1WrinkleOption,
+function Dry2ProgramSelection({
+  dry2price,
+  setDry2Program,
+  setDry2TemperatureOption,
+  setDry2WrinkleOption,
   setStep,
 }) {
   const programGroups = {
-    25: [
+    20: [
       { program: 7, name: "อบแห้งด่วน" },
       { program: 8, name: "ไม่ใช้ความร้อน" },
-      { program: 10, name: "30 นาที" },
     ],
 
-    35: [
+    30: [
       { program: 1, name: "ผ้าฝ้าย" },
       { program: 5, name: "เสื้อผ้าเด็ก" },
       { program: 6, name: "ผ้าบอบบาง" },
-      { program: 9, name: "กำจัดกลิ่นอับ" },
-      { program: 11, name: "60 นาที" },
     ],
 
-    45: [
+    40: [
       { program: 2, name: "ผ้าหลายชนิด" },
       { program: 3, name: "ผ้าใยสังเคราะห์" },
       { program: 4, name: "ชุดเครื่องนอน" },
-      { program: 12, name: "120 นาที" },
     ],
   };
 
-
-  const programs = programGroups[dry1price] || [];
+  const programs = programGroups[dry2price] || [];
 
   return (
     <>
@@ -39,10 +34,10 @@ function Dry1ProgramSelection({
         <button
           key={item.program}
           onClick={() => {
-            setDry1Program(item.program);
-            setDry1TemperatureOption(null);
-            setDry1WrinkleOption(false);
-            setStep(3_1_2);
+            setDry2Program(item.program);
+            setDry2TemperatureOption(null);
+            setDry2WrinkleOption(false);
+            setStep(3_2_2);
           }}
         >
           {item.program} - {item.name}
@@ -53,8 +48,8 @@ function Dry1ProgramSelection({
 
       <button
         onClick={() => {
-          setDry1Program(0);
-          setStep(3_1);
+          setDry2Program(0);
+          setStep(3_2);
         }}
       >
         ย้อนกลับ
@@ -63,4 +58,4 @@ function Dry1ProgramSelection({
   );
 }
 
-export default Dry1ProgramSelection;
+export default Dry2ProgramSelection;

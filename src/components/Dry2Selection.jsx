@@ -17,12 +17,13 @@ function Dry2Selection({
       >
         <div style={{ width: "120px" }}>
           <button
-            onClick={() => {
-              setDry2Prices(40);
-              setDry2Program(1);
-            }}
+          onClick={() => {
+            setDry2Prices(20);
+            setDry2Program(1);
+            setStep(3_2_1);
+          }}
           >
-            40 บาท
+            20 บาท
           </button>
         </div>
 
@@ -50,11 +51,12 @@ function Dry2Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry2Prices(50);
+              setDry2Prices(30);
               setDry2Program(2);
+              setStep(3_2_1);              
             }}
           >
-            50 บาท
+            30 บาท
           </button>
         </div>
 
@@ -82,11 +84,12 @@ function Dry2Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry2Prices(60);
+              setDry2Prices(40);
               setDry2Program(3);
+              setStep(3_2_1);                 
             }}
           >
-            60 บาท
+            40 บาท
           </button>
         </div>
 
@@ -106,7 +109,7 @@ function Dry2Selection({
       <br />
 
       <button onClick={() => setStep(1_2)}>ย้อนกลับ</button>
-      <button onClick={() => setStep(3_2_1)}>ต่อไป</button>
+
     </>
   );
 }
