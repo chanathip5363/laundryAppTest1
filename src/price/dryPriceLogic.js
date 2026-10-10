@@ -32,13 +32,17 @@ export function calculateDryTotalPrice({
     }
   }
 
-  if (wrinkleOption) {
-    if (dryerType === "dry2") {
-      total += 3;
-    } else {
-      total += 5;
+    if (wrinkleOption) {
+      if (dryerType === "dry2") {
+        total += 3;
+      } else if (dryerType === "dry3") {
+        total += 8;
+      } else if (dryerType === "dry4") {
+        total += 6;        
+      } else {
+        total += 5;
+      }
     }
-  }
 
 
   return total;

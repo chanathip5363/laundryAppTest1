@@ -27,13 +27,21 @@ function DryMachineSelection({
 
     <button
       onClick={() => {
-        setSelectedMachine("dry3");
+        setSelectedMachine("machine7");
         setStep(3_3);
       }}
     >
       เครื่องอบ 3
     </button>
 
+    <button
+      onClick={() => {
+        setSelectedMachine("machine8");
+        setStep(3_4);
+      }}
+    >
+      เครื่องอบ 4
+    </button>
 
       <br />
 

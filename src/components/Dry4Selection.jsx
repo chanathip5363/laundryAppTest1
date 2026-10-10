@@ -1,6 +1,6 @@
-function Dry2Selection({
-  setDry2Prices,
-  setDry2Program,
+function Dry4Selection({
+  setDry4Prices,
+  setDry4Program,
   setStep,
 }) {
   return (
@@ -18,18 +18,18 @@ function Dry2Selection({
         <div style={{ width: "120px" }}>
           <button
           onClick={() => {
-            setDry2Prices(20);
-            setDry2Program(1);
-            setStep(3_2_1);
+            setDry4Prices(24);
+            setDry4Program(1);
+            setStep(3_4_1);
           }}
           >
-            20 บาท
+            24 บาท
           </button>
         </div>
 
         <div style={{ marginBottom: "10px" }}>
           <h4>
-            รายละเอียด Dry2
+            รายละเอียด Dry4
             <br />
             - จำนวนผ้า 2 กก. หรือ 10 ชิ้น
             <br />
@@ -51,12 +51,12 @@ function Dry2Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry2Prices(30);
-              setDry2Program(2);
-              setStep(3_2_1);              
+              setDry4Prices(33);
+              setDry4Program(2);
+              setStep(3_4_1);              
             }}
           >
-            30 บาท
+            33 บาท
           </button>
         </div>
 
@@ -84,12 +84,12 @@ function Dry2Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry2Prices(40);
-              setDry2Program(3);
-              setStep(3_2_1);                 
+              setDry4Prices(46);
+              setDry4Program(3);
+              setStep(3_4_1);                 
             }}
           >
-            40 บาท
+            46 บาท
           </button>
         </div>
 
@@ -114,4 +114,4 @@ function Dry2Selection({
   );
 }
 
-export default Dry2Selection;
+export default Dry4Selection;

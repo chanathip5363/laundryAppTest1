@@ -17,18 +17,19 @@ function Dry3Selection({
       >
         <div style={{ width: "120px" }}>
           <button
-            onClick={() => {
-              setDry3Prices(25);
-              setDry3Program(1);
-            }}
+          onClick={() => {
+            setDry3Prices(30);
+            setDry3Program(1);
+            setStep(3_3_1);
+          }}
           >
-            25 บาท
+            30 บาท
           </button>
         </div>
 
         <div style={{ marginBottom: "10px" }}>
           <h4>
-            รายละเอียด
+            รายละเอียด Dry3
             <br />
             - จำนวนผ้า 2 กก. หรือ 10 ชิ้น
             <br />
@@ -50,11 +51,12 @@ function Dry3Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry3Prices(35);
+              setDry3Prices(40);
               setDry3Program(2);
+              setStep(3_3_1);              
             }}
           >
-            35 บาท
+            40 บาท
           </button>
         </div>
 
@@ -82,11 +84,12 @@ function Dry3Selection({
         <div style={{ width: "120px" }}>
           <button
             onClick={() => {
-              setDry3Prices(45);
+              setDry3Prices(50);
               setDry3Program(3);
+              setStep(3_3_1);                 
             }}
           >
-            45 บาท
+            50 บาท
           </button>
         </div>
 
@@ -105,13 +108,8 @@ function Dry3Selection({
 
       <br />
 
-      <button onClick={() => setStep(1_2)}>
-        ย้อนกลับ
-      </button>
+      <button onClick={() => setStep(1_2)}>ย้อนกลับ</button>
 
-      <button onClick={() => setStep(3_3_1)}>
-        ต่อไป
-      </button>
     </>
   );
 }

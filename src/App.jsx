@@ -19,7 +19,11 @@ import Dry2Selection from "./components/Dry2Selection";
 import Dry2ProgramSelection from "./components/Dry2ProgramSelection";
 import Dry2Options from "./components/Dry2Options";
 import Dry3Selection from "./components/Dry3Selection";
+import Dry3ProgramSelection from "./components/Dry3ProgramSelection";
 import Dry3Options from "./components/Dry3Options";
+import Dry4Selection from "./components/Dry4Selection";
+import Dry4ProgramSelection from "./components/Dry4ProgramSelection";
+import Dry4Options from "./components/Dry4Options";
 import WashMachineSelection from "./components/WashMachineSelection";
 import DryMachineSelection from "./components/DryMachineSelection";
 import QRPayment from "./components/QRPayment";
@@ -112,6 +116,8 @@ const [dry2price, setDry2Prices] = useState({});
 const [dry2program, setDry2Program] = useState({});
 const [dry3price, setDry3Prices] = useState({});
 const [dry3program, setDry3Program] = useState({});
+const [dry4price, setDry4Prices] = useState({});
+const [dry4program, setDry4Program] = useState({});
 
 const [dry1TemperatureOption, setDry1TemperatureOption] = useState(null);
 const [dry1WrinkleOption, setDry1WrinkleOption] = useState(false);
@@ -121,6 +127,9 @@ const [dry2WrinkleOption, setDry2WrinkleOption] = useState(false);
 
 const [dry3TemperatureOption, setDry3TemperatureOption] = useState(null);
 const [dry3WrinkleOption, setDry3WrinkleOption] = useState(false);
+
+const [dry4TemperatureOption, setDry4TemperatureOption] = useState(null);
+const [dry4WrinkleOption, setDry4WrinkleOption] = useState(false);
 
 const getDry1TotalPrice = () => {
   return calculateDryTotalPrice({
@@ -146,6 +155,16 @@ const getDry3TotalPrice = () => {
     basePrice: dry3price,
     temperatureOption: dry3TemperatureOption,
     wrinkleOption: dry3WrinkleOption,
+    dryerType: "dry3",
+  });
+};
+
+const getDry4TotalPrice = () => {
+  return calculateDryTotalPrice({
+    basePrice: dry4price,
+    temperatureOption: dry4TemperatureOption,
+    wrinkleOption: dry4WrinkleOption,
+    dryerType: "dry4",
   });
 };
 
@@ -187,6 +206,14 @@ const getPaymentTotal = () => {
   if (mode === "dry" && selectedMachine === "machine6") {
     return getDry2TotalPrice();
   }
+
+  if (mode === "dry" && selectedMachine === "machine7") {
+    return getDry3TotalPrice();
+  }  
+
+    if (mode === "dry" && selectedMachine === "machine8") {
+    return getDry4TotalPrice();
+  }  
 
   return getTotalPrice();
 };
@@ -329,6 +356,10 @@ const [aromaSelected, setAromaSelected] = useState(null);
           ? dry1program
           : mode === "dry" && selectedMachine === "machine6"
           ? dry2program
+          : mode === "dry" && selectedMachine === "machine7"
+          ? dry3program
+          : mode === "dry" && selectedMachine === "machine8"
+          ? dry4program
           : program;
 
 
@@ -373,11 +404,19 @@ const [aromaSelected, setAromaSelected] = useState(null);
                 temperatureOption:
                   selectedMachine === "machine6"
                     ? dry2TemperatureOption
+                    : selectedMachine === "machine7"
+                    ? dry3TemperatureOption
+                    : selectedMachine === "machine8"
+                    ? dry4TemperatureOption
                     : dry1TemperatureOption,
 
                 wrinkleOption:
                   selectedMachine === "machine6"
                     ? dry2WrinkleOption
+                    : selectedMachine === "machine7"
+                    ? dry3WrinkleOption
+                    : selectedMachine === "machine8"
+                    ? dry4WrinkleOption
                     : dry1WrinkleOption,
 
               }
@@ -462,6 +501,14 @@ const finishWash = (machine) => {
 
 <button onClick={() => finishWash("machine6")}>
   อบเสร็จ เครื่อง 2
+</button>
+
+<button onClick={() => finishWash("machine7")}>
+  อบเสร็จ เครื่อง 3
+</button>
+
+<button onClick={() => finishWash("machine8")}>
+  อบเสร็จ เครื่อง 4
 </button>
 
   </>
@@ -680,13 +727,64 @@ const finishWash = (machine) => {
 
 {/* STEP 3_3_1 */}
 {step === 3_3_1 && (
+  <Dry3ProgramSelection
+    dry3price={dry3price}
+    setDry3Program={setDry3Program}
+    setDry3TemperatureOption={setDry3TemperatureOption}
+    setDry3WrinkleOption={setDry3WrinkleOption}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_3_2 */}
+{step === 3_3_2 && (
   <Dry3Options
     dry3price={dry3price}
+    dry3program={dry3program}
     dry3TemperatureOption={dry3TemperatureOption}
     setDry3TemperatureOption={setDry3TemperatureOption}
     dry3WrinkleOption={dry3WrinkleOption}
     setDry3WrinkleOption={setDry3WrinkleOption}
     getDry3TotalPrice={getDry3TotalPrice}
+    setStep={setStep}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+
+{/* STEP 3_4 */}
+{step === 3_4 && (
+  <Dry4Selection
+    dry4price={dry4price}
+    setDry4Prices={setDry4Prices}
+    setDry4Program={setDry4Program}
+    resetOptions={resetOptions}
+    setProgram={setProgram}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_4_1 */}
+{step === 3_4_1 && (
+  <Dry4ProgramSelection
+    dry4price={dry4price}
+    setDry4Program={setDry4Program}
+    setDry4TemperatureOption={setDry4TemperatureOption}
+    setDry4WrinkleOption={setDry4WrinkleOption}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_4_2 */}
+{step === 3_4_2 && (
+  <Dry4Options
+    dry4price={dry4price}
+    dry4program={dry4program}
+    dry4TemperatureOption={dry4TemperatureOption}
+    setDry4TemperatureOption={setDry4TemperatureOption}
+    dry4WrinkleOption={dry4WrinkleOption}
+    setDry4WrinkleOption={setDry4WrinkleOption}
+    getDry4TotalPrice={getDry4TotalPrice}
     setStep={setStep}
     checkMachineBeforePay={checkMachineBeforePay}
     STEP_QR={STEP_QR}

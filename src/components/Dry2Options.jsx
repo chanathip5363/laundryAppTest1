@@ -47,7 +47,7 @@ function Dry2Options({
   </h3>
 
   <p>
-    👕 โปรแกรม:{" "}
+    👕 โปรแกรม ของ Dry2:{" "}
     <b>{programNameMap[dry2program] ?? "-"}</b>
   </p>
 

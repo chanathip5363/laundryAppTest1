@@ -1,11 +1,11 @@
-function Dry3Options({
-  dry3price,
-  dry3program,
-  dry3TemperatureOption,
-  setDry3TemperatureOption,
-  dry3WrinkleOption,
-  setDry3WrinkleOption,
-  getDry3TotalPrice,
+function Dry4Options({
+  dry4price,
+  dry4program,
+  dry4TemperatureOption,
+  setDry4TemperatureOption,
+  dry4WrinkleOption,
+  setDry4WrinkleOption,
+  getDry4TotalPrice,
   setStep,
   checkMachineBeforePay,
   STEP_QR,
@@ -15,7 +15,7 @@ function Dry3Options({
     1: "ผ้าฝ้าย",
     2: "ผ้าหลายชนิด",
 
-    4: "ชุดเครื่องนอน",
+
     5: "เสื้อผ้าเด็ก",
     6: "ผ้าบอบบาง",
 
@@ -29,7 +29,7 @@ function Dry3Options({
   return (
     <>
       <h2 style={{ marginBottom: "10px" }}>
-      {programNameMap[dry3program] ?? ""}
+      {programNameMap[dry4program] ?? ""}
       </h2>
 
 <div
@@ -47,20 +47,20 @@ function Dry3Options({
   </h3>
 
   <p>
-    👕 โปรแกรม ของ Dry3:{" "}
-    <b>{programNameMap[dry3program] ?? "-"}</b>
+    👕 โปรแกรม ของ Dry4:{" "}
+    <b>{programNameMap[dry4program] ?? "-"}</b>
   </p>
 
   <p>
     🌡️ ระดับการอบ:{" "}
     <b>
-      {dry3TemperatureOption === "normal"
+      {dry4TemperatureOption === "normal"
         ? "ปกติ"
-        : dry3TemperatureOption === "medium"
+        : dry4TemperatureOption === "medium"
         ? "กลาง"
-        : dry3TemperatureOption === "high"
+        : dry4TemperatureOption === "high"
         ? "สูง"
-        : dry3program >= 8
+        : dry4program >= 8
         ? "ปรับไม่ได้"    
         : "ยังไม่ได้เลือก"}
     </b>
@@ -68,40 +68,40 @@ function Dry3Options({
 
   <p>
     👔 ลดรอยยับ:{" "}
-    <b>{dry3WrinkleOption ? "ใช้" : "ไม่ใช้"}</b>
+    <b>{dry4WrinkleOption ? "ใช้" : "ไม่ใช้"}</b>
   </p>
 
   <hr style={{ margin: "10px 0" }} />
 
   <h2 style={{ color: "#2563eb" }}>
-    รวม: {getDry3TotalPrice()} บาท
+    รวม: {getDry4TotalPrice()} บาท
   </h2>
 </div>
 
-{dry3program !== 8 && (
+{dry4program !== 8 && (
       <div style={{ marginBottom: "20px" }}>
         <h4>อุณหภูมิการอบ</h4>
 
         <button
-          onClick={() => setDry3TemperatureOption("normal")}
+          onClick={() => setDry4TemperatureOption("normal")}
         >
           ปกติ +0 บาท
         </button>
 
         <button
-          onClick={() => setDry3TemperatureOption("medium")}
+          onClick={() => setDry4TemperatureOption("medium")}
         >
           กลาง +5 บาท
         </button>
 
         <button
-          onClick={() => setDry3TemperatureOption("high")}
+          onClick={() => setDry4TemperatureOption("high")}
         >
           สูง +10 บาท
         </button>
       </div>
 )}
-{dry3program === 8 && (
+{dry4program === 8 && (
   <div style={{ marginBottom: "20px" }}>
     <h4>อุณหภูมิการอบ</h4>
     <p>โปรแกรมนี้ไม่สามารถปรับอุณหภูมิได้</p>
@@ -115,20 +115,20 @@ function Dry3Options({
 
         <button
           onClick={() =>
-            setDry3WrinkleOption(!dry3WrinkleOption)
+            setDry4WrinkleOption(!dry4WrinkleOption)
           }
         >
-          {dry3WrinkleOption
-            ? "ลดรอยยับ +8 บาท ✓"
-            : "ลดรอยยับ +8 บาท"}
+          {dry4WrinkleOption
+            ? "ลดรอยยับ +6 บาท ✓"
+            : "ลดรอยยับ +6 บาท"}
         </button>
       </div>
 
       <button 
         onClick={() => {
-          setDry3TemperatureOption(null);
-          setDry3WrinkleOption(false);
-          setStep(3_3_1);
+          setDry4TemperatureOption(null);
+          setDry4WrinkleOption(false);
+          setStep(3_4_1);
         }}
       >
         ย้อนกลับ
@@ -147,14 +147,14 @@ function Dry3Options({
           marginTop: "10px",
         }}
         onClick={async () => {
-          if (!dry3price) {
+          if (!dry4price) {
             alert("กรุณาเลือกราคา");
             return;
           }
 
           if (
-            dry3program !== 8 &&
-            !dry3TemperatureOption
+            dry4program !== 8 &&
+            !dry4TemperatureOption
           ) {
             alert("กรุณาเลือกอุณหภูมิ");
             return;
@@ -163,7 +163,7 @@ function Dry3Options({
 
           if (
             !window.confirm(
-              `ยืนยันชำระ ${getDry3TotalPrice()} บาท ?`
+              `ยืนยันชำระ ${getDry4TotalPrice()} บาท ?`
             )
           ) {
             return;
@@ -182,4 +182,4 @@ function Dry3Options({
   );
 }
 
-export default Dry3Options;
+export default Dry4Options;
