@@ -38,14 +38,14 @@ PubSubClient client(espClient);
 // PIN
 // ======================================================
 
-#define D0 15
-#define D1 2
-#define D2 4
-#define D5 16
-#define D6 17
-#define D7 5    // temp
-#define D8 18   // start
-#define D9 19   // arom
+#define D0 4
+#define D1 13
+#define D2 25
+#define D3 26
+#define D4 27
+#define D7 23       // TEMP
+#define D8 18       // START
+#define D9 19       // AROMA
 #define DOOR_PIN 32
 #define BUZZER_PIN 33
 
@@ -130,8 +130,8 @@ void sendPattern(int pos) {
   digitalWrite(D0, pattern[pos][0]);
   digitalWrite(D1, pattern[pos][1]);
   digitalWrite(D2, pattern[pos][2]);
-  digitalWrite(D5, pattern[pos][3]);
-  digitalWrite(D6, pattern[pos][4]);
+  digitalWrite(D3, pattern[pos][3]);
+  digitalWrite(D4, pattern[pos][4]);
 }
 
 
@@ -421,15 +421,18 @@ void setup() {
 
   pinMode(D2, OUTPUT);
 
-  pinMode(D5, OUTPUT);
+  pinMode(D3, OUTPUT);
 
-  pinMode(D6, OUTPUT);
+  pinMode(D4, OUTPUT);
 
-  pinMode(D7, OUTPUT);
+  pinMode(D7, OUTPUT);  // ปล่อย TEMP โดยไม่เปิด pull-up/down  pinMode(D7, OUTPUT);
+  digitalWrite(D7, LOW);
 
-  pinMode(D8, OUTPUT);
+  pinMode(D8, OUTPUT);  // ปล่อย TEMP โดยไม่เปิด pull-up/downpinMode(D8, OUTPUT);
+  digitalWrite(D8, LOW);
 
-  pinMode(D9, OUTPUT);
+  pinMode(D9, OUTPUT); // ปล่อย TEMP โดยไม่เปิด pull-up/down pinMode(D9, OUTPUT);
+  digitalWrite(D9, LOW);
 
   pinMode(DOOR_PIN, INPUT_PULLUP);
 
@@ -688,24 +691,12 @@ void setup() {
 
 void startMachine() {
 
-
   digitalWrite(D8, HIGH);
-
-
   Serial.println("TOUCH BTN POWER");
-
-
-  delayloop(1000);
-
-
+  delayloop(800);
   digitalWrite(D8, LOW);
-
-
   Serial.println("POWER ON");
-
-
   delayloop(1000);
-
 
   machineState = "RUNNING";
 
@@ -772,7 +763,7 @@ void runProgram(int program) {
   sendPattern(0);
 
 
-  delayloop(3000);
+  delayloop(2000);
 
 
   Serial.println("Goto Cal+1");
@@ -781,7 +772,7 @@ void runProgram(int program) {
   sendPattern(1);
 
 
-  delayloop(3000);
+  delayloop(2000);
 
 
   // i = 2 เพราะ Goto Calibate+1 ไปแล้ว
@@ -797,7 +788,7 @@ void runProgram(int program) {
     sendPattern(i);
 
 
-    delayloop(800);
+    delayloop(400);
 
 
     client.loop();
@@ -812,26 +803,13 @@ void runProgram(int program) {
   // ----------------------------------------------------
 
   for (int i = 0; i < tempPulse; i++) {
-
-
     digitalWrite(D7, HIGH);
-
-
     Serial.println("TEMP Pulse ON");
-
-
     delayloop(800);
-
-
     digitalWrite(D7, LOW);
-
-
     Serial.println("TEMP Pulse OFF");
-
-
     delayloop(1000);
   }
-
 
   delayloop(2000);
 
@@ -842,25 +820,13 @@ void runProgram(int program) {
 
   for (int i = 0; i < aromaPulse; i++) {
 
-
     digitalWrite(D9, HIGH);
-
-
     Serial.println("AROMA Pulse ON");
-
-
     delayloop(800);
-
-
     digitalWrite(D9, LOW);
-
-
     Serial.println("AROMA Pulse OFF");
-
-
     delayloop(1000);
   }
-
 
   delayloop(2000);
 

@@ -43,7 +43,7 @@ PubSubClient client(espClient);
 #define D2 4
 #define D5 16
 #define D6 17
-#define D7 5    // temp
+#define D7     // temp
 #define D8 18   // start
 #define D9 19   // arom
 #define DOOR_PIN 32

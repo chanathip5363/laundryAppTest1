@@ -38,16 +38,16 @@ PubSubClient client(espClient);
 // PIN
 // ======================================================
 
-#define D0 15
-#define D1 2
-#define D2 4
-#define D5 16
-#define D6 17
-#define D7 5    // temp
-#define D8 18   // start
-#define D9 19   // arom
+#define D0 4
+#define D1 13
+#define D2 25
+#define D3 26
+#define D4 27
+#define D7 23       // TEMP
+#define D8 18       // START
+#define D9 19       // AROMA
 #define DOOR_PIN 32
-#define BUZZER_PIN 33
+// #define BUZZER_PIN 33
 
 
 bool lastState = HIGH;
@@ -62,7 +62,7 @@ volatile int pulseCount = 0;  // 200469 เพิ่มอ่าน buuzer ค�
 volatile unsigned long lastPulseTime = 0;
 volatile unsigned long lastValidPulse = 0;
 
-volatile bool buzzerActive = false;   // 200526 เริ่มทำ interrupt trigger
+// volatile bool buzzerActive = false;   // 200526 เริ่มทำ interrupt trigger
 
 const unsigned long EVENT_GAP = 350;
 
@@ -77,12 +77,12 @@ int program = 0;
 
 byte pattern[16][5] = {
 
-  {1,0,1,1,0}, // 12 - 4
-  {1,0,1,1,1}, // 13 - 5
   {0,0,1,0,0}, // 8 - 0
   {0,0,1,0,1}, // 9 - 1
   {1,0,1,0,1}, // 10 - 2
-  {1,0,1,0,0}, // 11 - 3  
+  {1,0,1,0,0}, // 11 - 3
+  {1,0,1,1,0}, // 12 - 4
+  {1,0,1,1,1}, // 13 - 5
   {0,0,1,1,1}, // 14 - 6
   {0,0,1,1,0}, // 15 - 7
   {0,1,1,1,1}, // 1 - 9 - 8
@@ -91,14 +91,34 @@ byte pattern[16][5] = {
   {1,1,1,0,0}, // 4 - 12 - 11
   {1,1,1,0,1}, // 5 - 13 - 12
   {0,1,1,0,1}, // 6 - 14 - 13
-  {0,1,1,0,0}, // 7 - 15 - 14
+  {0,0}, // 7 - 15 - 14
   {0,1,1,1,0}  // 0 - 8 -15 OFF
 
 };
 
+// byte pattern[16][5] = {
+
+//   {1,0,1,1,0}, // 12 - 4
+//   {1,0,1,1,1}, // 13 - 5
+//   {0,0,1,0,0}, // 8 - 0
+//   {0,0,1,0,1}, // 9 - 1
+//   {1,0,1,0,1}, // 10 - 2
+//   {1,0,1,0,0}, // 11 - 3  
+//   {0,0,1,1,1}, // 14 - 6
+//   {0,0,1,1,0}, // 15 - 7
+//   {0,1,1,1,1}, // 1 - 9 - 8
+//   {1,1,1,1,1}, // 2 - 10 - 9
+//   {1,1,1,1,0}, // 3 - 11 - 10
+//   {1,1,1,0,0}, // 4 - 12 - 11
+//   {1,1,1,0,1}, // 5 - 13 - 12
+//   {0,1,1,0,1}, // 6 - 14 - 13
+//   {0,1,1,0,0}, // 7 - 15 - 14
+//   {0,1,1,1,0}  // 0 - 8 -15 OFF
+
+// };
+
 int aromaPulse;
 int tempPulse;
-
 
 // ======================================================
 // DELAY LOOP
@@ -112,7 +132,7 @@ void delayloop(unsigned long waitTime) {
 
     client.loop();
 
-    processBuzzer();   // 260569 ⭐ เพิ่มบรรทัดนี้
+    // processBuzzer();   // 260569 ⭐ เพิ่มบรรทัดนี้
 
     esp_task_wdt_reset();
 
@@ -130,8 +150,8 @@ void sendPattern(int pos) {
   digitalWrite(D0, pattern[pos][0]);
   digitalWrite(D1, pattern[pos][1]);
   digitalWrite(D2, pattern[pos][2]);
-  digitalWrite(D5, pattern[pos][3]);
-  digitalWrite(D6, pattern[pos][4]);
+  digitalWrite(D3, pattern[pos][3]);
+  digitalWrite(D4, pattern[pos][4]);
 }
 
 
@@ -190,49 +210,49 @@ void callback(char* topic, byte* payload, unsigned int length) {
 // BUZZER INTERRUPT
 // ======================================================
 
-void IRAM_ATTR onPulse() {
+// void IRAM_ATTR onPulse() {
 
-  unsigned long now = millis();
+//   unsigned long now = millis();
 
-  // กันนับซ้ำจากคลื่นเดียวกัน
-  if (now - lastValidPulse > 180) {
+//   // กันนับซ้ำจากคลื่นเดียวกัน
+//   if (now - lastValidPulse > 180) {
 
-    pulseCount++;
+//     pulseCount++;
 
-    lastValidPulse = now;
-  }
+//     lastValidPulse = now;
+//   }
 
-  lastPulseTime = now;
+//   lastPulseTime = now;
 
-  buzzerActive = true;
-}
+//   buzzerActive = true;
+// }
 
 
 // ======================================================
 // PROCESS BUZZER
 // ======================================================
 
-void processBuzzer() {
+// void processBuzzer() {
 
-  if (pulseCount > 0 && millis() - lastPulseTime > EVENT_GAP) {
+//   if (pulseCount > 0 && millis() - lastPulseTime > EVENT_GAP) {
 
-    noInterrupts();
+//     noInterrupts();
 
-    int count = pulseCount;
+//     int count = pulseCount;
 
-    pulseCount = 0;
+//     pulseCount = 0;
 
-    interrupts();
-
-
-    Serial.print("BUZZER COUNT = ");
-
-    Serial.println(count);
+//     interrupts();
 
 
-    handleEvent(count);
-  }
-}
+//     Serial.print("BUZZER COUNT = ");
+
+//     Serial.println(count);
+
+
+//     handleEvent(count);
+//   }
+// }
 
 
 // ======================================================
@@ -421,26 +441,26 @@ void setup() {
 
   pinMode(D2, OUTPUT);
 
-  pinMode(D5, OUTPUT);
+  pinMode(D3, OUTPUT);
 
-  pinMode(D6, OUTPUT);
+  pinMode(D4, OUTPUT);
 
-  pinMode(D7, OUTPUT);
+  pinMode(D7, INPUT);  // ปล่อย TEMP โดยไม่เปิด pull-up/down  pinMode(D7, OUTPUT);
 
-  pinMode(D8, OUTPUT);
+  pinMode(D8, INPUT);  // ปล่อย TEMP โดยไม่เปิด pull-up/downpinMode(D8, OUTPUT);
 
-  pinMode(D9, OUTPUT);
+  pinMode(D9, INPUT); // ปล่อย TEMP โดยไม่เปิด pull-up/down pinMode(D9, OUTPUT);
 
   pinMode(DOOR_PIN, INPUT_PULLUP);
 
-  pinMode(BUZZER_PIN, INPUT_PULLUP);
+  // pinMode(BUZZER_PIN, INPUT_PULLUP);
 
 
-  attachInterrupt(
-    digitalPinToInterrupt(BUZZER_PIN),
-    onPulse,
-    FALLING
-  );
+  // attachInterrupt(
+  //   digitalPinToInterrupt(BUZZER_PIN),
+  //   onPulse,
+  //   FALLING
+  // );
 
 
   // ====================================================
@@ -689,21 +709,15 @@ void setup() {
 void startMachine() {
 
 
+  pinMode(D8, OUTPUT);
   digitalWrite(D8, HIGH);
 
-
-  Serial.println("TOUCH BTN POWER");
-
-
+  Serial.println("START Pulse ON");
   delayloop(1000);
-
 
   digitalWrite(D8, LOW);
 
-
-  Serial.println("POWER ON");
-
-
+  Serial.println("START RELEASE");
   delayloop(1000);
 
 
@@ -772,7 +786,7 @@ void runProgram(int program) {
   sendPattern(0);
 
 
-  delayloop(3000);
+  delayloop(1000);
 
 
   Serial.println("Goto Cal+1");
@@ -781,7 +795,7 @@ void runProgram(int program) {
   sendPattern(1);
 
 
-  delayloop(3000);
+  delayloop(1000);
 
 
   // i = 2 เพราะ Goto Calibate+1 ไปแล้ว
@@ -797,7 +811,7 @@ void runProgram(int program) {
     sendPattern(i);
 
 
-    delayloop(800);
+    delayloop(400);
 
 
     client.loop();
@@ -811,59 +825,45 @@ void runProgram(int program) {
   // Temperature Pulse
   // ----------------------------------------------------
 
-  for (int i = 0; i < tempPulse; i++) {
+  const int pulsesToSend = tempPulse;
+
+for (int i = 0; i < pulsesToSend; i++) {
+  pinMode(D7, OUTPUT);
+  digitalWrite(D7, HIGH);
+
+  Serial.printf("TEMP %d/%d ON\n", i + 1, pulsesToSend);
+  delayloop(600);
+
+  pinMode(D7, INPUT);  // ปล่อยเป็นขาลอย แทน digitalWrite LOW
+
+  Serial.printf("TEMP %d/%d RELEASE\n", i + 1, pulsesToSend);
+  delayloop(600);
+}
 
 
-    digitalWrite(D7, HIGH);
-
-
-    Serial.println("TEMP Pulse ON");
-
-
-    delayloop(800);
-
-
-    digitalWrite(D7, LOW);
-
-
-    Serial.println("TEMP Pulse OFF");
-
-
-    delayloop(1000);
-  }
-
-
-  delayloop(2000);
+  delayloop(4000);
 
 
   // ----------------------------------------------------
   // Aroma Pulse
   // ----------------------------------------------------
 
-  for (int i = 0; i < aromaPulse; i++) {
+  const int aromaPulsesToSend = aromaPulse;
 
-
+  for (int i = 0; i < aromaPulsesToSend; i++) {
+    pinMode(D9, OUTPUT);
     digitalWrite(D9, HIGH);
 
+    Serial.printf("AROMA %d/%d ON\n", i + 1, aromaPulsesToSend);
+    delayloop(600);
 
-    Serial.println("AROMA Pulse ON");
+    pinMode(D9, INPUT);
 
-
-    delayloop(800);
-
-
-    digitalWrite(D9, LOW);
-
-
-    Serial.println("AROMA Pulse OFF");
-
-
-    delayloop(1000);
+    Serial.printf("AROMA %d/%d RELEASE\n", i + 1, aromaPulsesToSend);
+    delayloop(600);
   }
 
-
   delayloop(2000);
-
 
   startMachine();
 }
@@ -1103,61 +1103,61 @@ void resetMachine() {
 // HANDLE BUZZER EVENT
 // ======================================================
 
-void handleEvent(int count) {
+// void handleEvent(int count) {
 
 
-  if (count == 1) {
+//   if (count == 1) {
 
-    Serial.println("1 beep");
-  }
-
-
-  else if (count == 2) {
-
-    Serial.println("2 beep");
-  }
+//     Serial.println("1 beep");
+//   }
 
 
-  else if (count == 3) {
+//   else if (count == 2) {
 
-    Serial.println("3 beep");
-  }
-
-
-  else if (count == 4) {
-
-    Serial.println("4 beep = OFF");
-
-    powerOn = false;
-  }
+//     Serial.println("2 beep");
+//   }
 
 
-  else if (count == 5) {
+//   else if (count == 3) {
+
+//     Serial.println("3 beep");
+//   }
 
 
-    if (!powerOn) {
+//   else if (count == 4) {
 
-      Serial.println("5 beep = ON");
+//     Serial.println("4 beep = OFF");
 
-      powerOn = true;
-
-
-    } else {
-
-      Serial.println("4 beep = OFF (extra pulse)");
-
-      powerOn = false;
-    }
-  }
+//     powerOn = false;
+//   }
 
 
-  else if (count == 6) {
+//   else if (count == 5) {
 
-    Serial.println("5 beep = ON (extra pulse)");
 
-    powerOn = true;
-  }
-}
+//     if (!powerOn) {
+
+//       Serial.println("5 beep = ON");
+
+//       powerOn = true;
+
+
+//     } else {
+
+//       Serial.println("4 beep = OFF (extra pulse)");
+
+//       powerOn = false;
+//     }
+//   }
+
+
+//   else if (count == 6) {
+
+//     Serial.println("5 beep = ON (extra pulse)");
+
+//     powerOn = true;
+//   }
+// }
 
 
 // ======================================================
@@ -1272,8 +1272,8 @@ if (millis() - lastStatus > 30000) {
   // Buzzer
   // ----------------------------------------------------
 
-  if (buzzerActive) {
+  // if (buzzerActive) {
 
-    processBuzzer();
-  }
+  //   processBuzzer();
+  // }
 }
