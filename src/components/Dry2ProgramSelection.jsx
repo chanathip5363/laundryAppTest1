@@ -1,3 +1,4 @@
+
 function Dry2ProgramSelection({
   dry2price,
   setDry2Program,
@@ -27,34 +28,60 @@ function Dry2ProgramSelection({
   const programs = programGroups[dry2price] || [];
 
   return (
-    <>
-      <h2>เลือกโปรแกรมอบ</h2>
+    <div className="dry-program-selection">
+      <div className="dry-program-heading">
+        <p>เลือกโปรแกรมที่เหมาะกับชนิดผ้าของคุณ</p>
 
-      {programs.map((item) => (
-        <button
-          key={item.program}
-          onClick={() => {
-            setDry2Program(item.program);
-            setDry2TemperatureOption(null);
-            setDry2WrinkleOption(false);
-            setStep(3_2_2);
-          }}
-        >
-          {item.program} - {item.name}
-        </button>
-      ))}
+        <span className="dry-program-price">
+          ราคาเริ่มต้น {dry2price} บาท
+        </span>
+      </div>
 
-      <br />
+      <div className="dry-program-list">
+        {programs.map((item) => (
+          <button
+            key={item.program}
+            type="button"
+            className="dry-program-card"
+            onClick={() => {
+              setDry2Program(item.program);
+              setDry2TemperatureOption(null);
+              setDry2WrinkleOption(false);
+              setStep(3_2_2);
+            }}
+          >
+            <span className="dry-program-card-icon">
+              <span aria-hidden="true">♨</span>
+            </span>
+
+            <span className="dry-program-card-content">
+              <span className="dry-program-card-name">
+                {item.name}
+              </span>
+
+              <span className="dry-program-card-code">
+                โปรแกรม {item.program}
+              </span>
+            </span>
+
+            <span className="dry-program-card-arrow">
+              →
+            </span>
+          </button>
+        ))}
+      </div>
 
       <button
+        type="button"
+        className="machine-back"
         onClick={() => {
           setDry2Program(0);
           setStep(3_2);
         }}
       >
-        ย้อนกลับ
+        ← ย้อนกลับ
       </button>
-    </>
+    </div>
   );
 }
 

@@ -1,3 +1,4 @@
+
 function Wash30Options({
   program,
   programNameMap,
@@ -17,174 +18,178 @@ function Wash30Options({
   checkMachineBeforePay,
   STEP_QR,
 }) {
+  const temperatures = tempOptionsMap[program] ?? [];
+  const aromas = aromaOptionsMap[program] ?? [];
+
+  const handleConfirm = async () => {
+    if (!program) {
+      alert("กรุณาเลือกโปรแกรม");
+      return;
+    }
+
+    const cmd = buildCommand();
+    console.log(cmd);
+
+    if (
+      !window.confirm(
+        `ยืนยันชำระ ${getTotalPrice()} บาท ?`
+      )
+    ) {
+      return;
+    }
+
+    const ok = await checkMachineBeforePay();
+    if (!ok) return;
+
+    setStep(STEP_QR);
+  };
+
   return (
-    <>
-      <h2 style={{ marginBottom: "10px" }}>
-        {programNameMap[program] ?? ""}
-      </h2>
-
-      <div
-        style={{
-          border: "1px solid #e5e7eb",
-          padding: "20px",
-          borderRadius: "16px",
-          marginBottom: "20px",
-          background: "#ffffff",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-        }}
-      >
-        <h3 style={{ marginBottom: "10px" }}>
-          🧾 สรุปรายการ
-        </h3>
-
-        <p>
-          🧺 โปรแกรม:{" "}
-          <b>{programNameMap[program] ?? "-"}</b>
-        </p>
-
-        <p>
-          🌡️ อุณหภูมิ:{" "}
-          <b>
-            {tempOption ? tempOption + "°C" : "ปกติ"}
-          </b>
-        </p>
-
-        <p>
-          🌸 Aroma:{" "}
-          <b>
-            {aromaOption ? "เพิ่ม" : "ไม่ใช้"}
-          </b>
-        </p>
-
-        <hr style={{ margin: "10px 0" }} />
-
-        <h2 style={{ color: "#2563eb" }}>
-          รวม: {getTotalPrice()} บาท
-        </h2>
+    <div className="wash30-options">
+      <div className="wash30-options-program">
+        <span>โปรแกรมที่เลือก</span>
+        <strong>
+          {programNameMap[program] ?? "-"}
+        </strong>
       </div>
 
-      {/* อุณหภูมิที่แสดงตามความสามารถของแต่ละโปรแกรม */}
-      {tempShowOptionsMap[program]?.map((tempShow) => (
-        <label
-          key={tempShow}
-          style={{
-            display: "block",
-            padding: "8px",
-            borderRadius: "8px",
-          }}
-        >
-          🌡️ เพิ่มอุณหภูมิ
-        </label>
-      ))}
+      {temperatures.length > 0 && (
+        <section className="wash30-options-section">
+          <h3>🌡️ เลือกอุณหภูมิ</h3>
+          <p>เลือกอุณหภูมิที่ต้องการ หรือใช้ค่าปกติ</p>
 
-      {tempOptionsMap[program]?.map((temp) => (
-        <label
-          key={temp}
-          style={{
-            display: "block",
-            padding: "8px",
-            borderRadius: "8px",
-            background:
-              tempOption === temp
-                ? "#e0f2fe"
-                : "transparent",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={tempOption === temp}
-            onChange={() =>
-              setTempOption(
-                tempOption === temp ? null : temp
-              )
-            }
-          />
-          {temp}°C (+ {tempPriceMap[temp] ?? 0} บาท)
-        </label>
-      ))}
+          <div className="wash30-options-list">
+            <label
+              className={`wash30-option-item ${
+                tempOption == null ? "selected" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="wash30-temperature"
+                checked={tempOption == null}
+                onChange={() => setTempOption(null)}
+              />
+              <span className="wash30-option-text">
+                <strong>ปกติ</strong>
+                <small>ไม่เพิ่มราคา</small>
+              </span>
+            </label>
 
-      <br />
+            {temperatures.map((temp) => (
+              <label
+                key={temp}
+                className={`wash30-option-item ${
+                  tempOption === temp ? "selected" : ""
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="wash30-temperature"
+                  checked={tempOption === temp}
+                  onChange={() => setTempOption(temp)}
+                />
 
-      {aromaOptionsMap[program]?.map((aroma) => (
-        <label
-          key={aroma}
-          style={{
-            display: "block",
-            padding: "8px",
-            borderRadius: "8px",
-            background:
-              aromaOption === aroma
-                ? "#e0f2fe"
-                : "transparent",
-          }}
-        >
-          <h3>เพิ่มความหอม</h3>
+                <span className="wash30-option-text">
+                  <strong>{temp}°C</strong>
+                  <small>
+                    เพิ่ม {tempPriceMap[temp] ?? 0} บาท
+                  </small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
-          <input
-            type="checkbox"
-            checked={aromaOption === aroma}
-            onChange={() =>
-              setAromaOption(
-                aromaOption === aroma ? null : aroma
-              )
-            }
-          />
 
-          {aroma}
-        </label>
-      ))}
+      {aromas.length > 0 && (
+        <section className="wash30-options-section">
+          <h3>🌸 เพิ่มความหอม</h3>
+          <p>เลือกเพิ่มน้ำยาหอมตามต้องการ</p>
 
-      <br />
+          <div className="wash30-options-list">
+            {aromas.map((aroma) => (
+              <label
+                key={aroma}
+                className={`wash30-option-item ${
+                  aromaOption === aroma ? "selected" : ""
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={aromaOption === aroma}
+                  onChange={() =>
+                    setAromaOption(
+                      aromaOption === aroma ? null : aroma
+                    )
+                  }
+                />
+
+                <span className="wash30-option-text">
+                  <strong>{aroma}</strong>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+
+      <div className="wash30-options-summary">
+        <h3>สรุปรายการ</h3>
+
+        <div className="wash30-options-row">
+          <span>โปรแกรม</span>
+          <strong>
+            {programNameMap[program] ?? "-"}
+          </strong>
+        </div>
+
+        <div className="wash30-options-row">
+          <span>อุณหภูมิ</span>
+          <strong>
+            {tempOption != null
+              ? `${tempOption}°C`
+              : "ปกติ"}
+          </strong>
+        </div>
+
+        <div className="wash30-options-row">
+          <span>น้ำยาหอม</span>
+          <strong>
+            {aromaOption != null
+              ? String(aromaOption)
+              : "ไม่ใช้"}
+          </strong>
+        </div>
+
+        <div className="wash30-options-total">
+          <strong>ยอดชำระ</strong>
+          <span>{getTotalPrice()} บาท</span>
+        </div>
+      </div>
 
       <button
+        type="button"
+        className="wash30-options-confirm"
+        onClick={handleConfirm}
+      >
+        ยืนยันและชำระเงิน →
+      </button>
+
+      <button
+        type="button"
+        className="machine-back"
         onClick={() => {
           resetOptions();
           setProgram(0);
           setStep(2_2);
         }}
       >
-        ย้อนกลับ
+        ← ย้อนกลับ
       </button>
-
-      <button
-        style={{
-          width: "100%",
-          padding: "15px",
-          fontSize: "18px",
-          background: "#22c55e",
-          color: "white",
-          border: "none",
-          borderRadius: "12px",
-          cursor: "pointer",
-          marginTop: "10px",
-        }}
-        onClick={async () => {
-          const cmd = buildCommand();
-          console.log(cmd);
-
-          if (!program) {
-            alert("กรุณาเลือกโปรแกรม");
-            return;
-          }
-
-          if (
-            !window.confirm(
-              `ยืนยันชำระ ${getTotalPrice()} บาท ?`
-            )
-          ) {
-            return;
-          }
-
-          const ok = await checkMachineBeforePay();
-
-          if (!ok) return;
-
-          setStep(STEP_QR);
-        }}
-      >
-        ยืนยันและชำระเงิน
-      </button>
-    </>
+    </div>
   );
 }
 

@@ -1,3 +1,4 @@
+
 function Wash30ProgramSelection({
   programNameMap,
   setProgram,
@@ -5,92 +6,109 @@ function Wash30ProgramSelection({
   setStep,
   resetOptions,
 }) {
+  const programs = [
+    {
+      id: 1,
+      name: "ชุดกีฬา",
+      description: "สำหรับชุดออกกำลังกาย",
+      icon: "👕",
+    },
+    {
+      id: 2,
+      name: "ผ้าขนสัตว์",
+      description: "ดูแลผ้าที่ต้องการความอ่อนโยน",
+      icon: "🧶",
+    },
+    {
+      id: 3,
+      name: "ผ้าบอบบาง",
+      description: "เหมาะสำหรับเนื้อผ้าที่ละเอียดอ่อน",
+      icon: "🌸",
+    },
+    {
+      id: 5,
+      name: "ผ้าผสม 45 นาที",
+      description: "ซักผ้าหลากหลายชนิด",
+      icon: "🧺",
+    },
+    {
+      id: 7,
+      name: "ผ้าฝ้าย",
+      description: "เหมาะสำหรับเสื้อผ้าฝ้ายทั่วไป",
+      icon: "👔",
+    },
+    {
+      id: 8,
+      name: "ผ้าขาว",
+      description: "สำหรับเสื้อผ้าสีขาว",
+      icon: "✨",
+    },
+    {
+      id: 9,
+      name: "ซักถนอมสีผ้า",
+      description: "ช่วยดูแลสีสันของเสื้อผ้า",
+      icon: "🎨",
+    },
+  ];
+
+  const handleSelect = (programId) => {
+    setProgram(programId);
+    setProgramPrice(30);
+    setStep(2_2_1);
+  };
+
   return (
-    <>
-      <h2>เลือกโปรแกรม</h2>
+    <div className="wash30-selection">
+      <p className="wash30-subtitle">
+        แพ็กเกจซักมาตรฐาน 30 บาท
+      </p>
+
+      <div className="wash30-program-list">
+        {programs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className="wash30-program-card"
+            onClick={() => handleSelect(item.id)}
+          >
+            <span className="wash30-program-icon">
+              {item.icon}
+            </span>
+
+            <span className="wash30-program-content">
+              <strong>
+                {programNameMap[item.id] ?? item.name}
+              </strong>
+              <small>{item.description}</small>
+            </span>
+
+            <span className="wash30-program-arrow">
+              →
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="wash30-note">
+        <span>ⓘ</span>
+        <span>
+          หลังเลือกโปรแกรม สามารถเลือกอุณหภูมิ
+          และน้ำยาหอมเพิ่มเติมได้
+        </span>
+      </div>
 
       <button
-        onClick={() => {
-          setProgram(1);
-          setProgramPrice(30);
-          setStep(2_2_1);
-        }}
-      >
-        {programNameMap[1] ?? "ชุดกีฬา"}
-      </button>
-
-      <button
-        onClick={() => {
-          setProgram(2);
-          setProgramPrice(30);
-          setStep(2_2_1);
-        }}
-      >
-        {programNameMap[2] ?? "ผ้าขนสัตว์"}
-      </button>
-
-      <button
-        onClick={() => {
-          setProgram(3);
-          setProgramPrice(30);
-          setStep(2_2_1);
-        }}
-      >
-        {programNameMap[3] ?? "ผ้าบอบบาง"}
-      </button>
-
-      <button
-        onClick={() => {
-          setProgram(5);
-          setProgramPrice(30);
-          setStep(2_2_1);
-        }}
-      >
-        {programNameMap[5] ?? "ผ้าผสม 45 นาที"}
-      </button>
-
-      <button
-        onClick={() => {
-          setProgram(7);
-          setProgramPrice(30);
-          setStep(2_2_1);
-        }}
-      >
-        {programNameMap[7] ?? "ผ้าฝ้าย"}
-      </button>
-
-      <button
-        onClick={() => {
-          setProgram(8);
-          setProgramPrice(30);
-          setStep(2_2_1);
-        }}
-      >
-        {programNameMap[8] ?? "ผ้าขาว"}
-      </button>
-
-      <button
-        onClick={() => {
-          setProgram(9);
-          setProgramPrice(30);
-          setStep(2_2_1);
-        }}
-      >
-        {programNameMap[9] ?? "ซักถนอมสีผ้า"}
-      </button>
-
-      <br />
-
-      <button
+        type="button"
+        className="machine-back"
         onClick={() => {
           resetOptions();
           setProgram(0);
           setStep(2);
         }}
       >
-        ย้อนกลับ
+        ← ย้อนกลับ
       </button>
-    </>
+    </div>
   );
 }
 

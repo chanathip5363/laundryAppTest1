@@ -1,62 +1,30 @@
-function WashMachineSelection({
+
+import MachineSelectionGrid from "./MachineSelectionGrid";
+
+export default function WashMachineSelection({
   selectedMachine,
   setSelectedMachine,
   setStep,
 }) {
+  const machines = [
+    { id: "machine1", name: "เครื่องซัก 1", model: "Toshiba" },
+    { id: "machine2", name: "เครื่องซัก 2", model: "TCL" },
+    { id: "machine3", name: "เครื่องซัก 3", model: "LG" },
+    { id: "machine4", name: "เครื่องซัก 4", model: "Samsung" },
+  ];
+
   return (
-    <>
-      <h2>เลือกเครื่องซัก</h2>
-
-      <button
-      onClick={() => {
-        setSelectedMachine("machine1");
+    <MachineSelectionGrid
+      machines={machines}
+      type="wash"
+      onSelect={(machine) => {
+        setSelectedMachine(machine.id);
         setStep(2);
       }}
-    >
-      เครื่องซัก 1
-    </button>
-
-    <button
-      onClick={() => {
-        setSelectedMachine("machine2");
-        setStep(2);
+      onBack={() => {
+        setSelectedMachine(null);
+        setStep(1);
       }}
-    >
-      เครื่องซัก 2
-    </button>
-
-    <button
-      onClick={() => {
-        setSelectedMachine("machine3");
-        setStep(2);
-      }}
-    >
-      เครื่องซัก 3
-    </button>
-
-    <button
-      onClick={() => {
-        setSelectedMachine("machine4");
-        setStep(2);
-      }}
-    >
-      เครื่องซัก 4
-    </button>
-   
-
-      <br />
-
-      <button
-        onClick={() => {
-          setSelectedMachine(null);
-          setStep(1);
-        }}
-      >
-        ย้อนกลับ
-      </button>
-
-    </>
+    />
   );
 }
-
-export default WashMachineSelection;

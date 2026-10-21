@@ -1,3 +1,4 @@
+
 function Dry3Options({
   dry3price,
   dry3program,
@@ -10,142 +11,138 @@ function Dry3Options({
   checkMachineBeforePay,
   STEP_QR,
 }) {
-
   const programNameMap = {
     1: "ผ้าฝ้าย",
     2: "ผ้าหลายชนิด",
-
     4: "ชุดเครื่องนอน",
     5: "เสื้อผ้าเด็ก",
     6: "ผ้าบอบบาง",
-
     8: "ไม่ใช้ความร้อน",
   };
 
+  const canAdjustTemperature = dry3program !== 8;
 
+  const temperatureOptions = [
+    { value: "normal", name: "ปกติ", price: 0 },
+    { value: "medium", name: "กลาง", price: 5 },
+    { value: "high", name: "สูง", price: 10 },
+  ];
 
-
+  const temperatureName =
+    dry3TemperatureOption === "normal"
+      ? "ปกติ"
+      : dry3TemperatureOption === "medium"
+      ? "กลาง"
+      : dry3TemperatureOption === "high"
+      ? "สูง"
+      : canAdjustTemperature
+      ? "ยังไม่ได้เลือก"
+      : "ปรับไม่ได้";
 
   return (
-    <>
-      <h2 style={{ marginBottom: "10px" }}>
-      {programNameMap[dry3program] ?? ""}
-      </h2>
+    <div className="dry-options">
+      <h3 className="dry-options-program-name">
+        {programNameMap[dry3program] ?? ""}
+      </h3>
 
-<div
-  style={{
-    border: "1px solid #e5e7eb",
-    padding: "20px",
-    borderRadius: "16px",
-    marginBottom: "20px",
-    background: "#ffffff",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-  }}
->
-  <h3 style={{ marginBottom: "10px" }}>
-    🧾 สรุปรายการ
-  </h3>
+      {/* สรุปรายการ */}
+      <div className="dry-options-summary">
+        <h3>สรุปรายการ</h3>
 
-  <p>
-    👕 โปรแกรม ของ Dry3:{" "}
-    <b>{programNameMap[dry3program] ?? "-"}</b>
-  </p>
+        <div className="dry-options-row">
+          <span>โปรแกรม</span>
+          <strong>
+            {programNameMap[dry3program] ?? "-"}
+          </strong>
+        </div>
 
-  <p>
-    🌡️ ระดับการอบ:{" "}
-    <b>
-      {dry3TemperatureOption === "normal"
-        ? "ปกติ"
-        : dry3TemperatureOption === "medium"
-        ? "กลาง"
-        : dry3TemperatureOption === "high"
-        ? "สูง"
-        : dry3program >= 8
-        ? "ปรับไม่ได้"    
-        : "ยังไม่ได้เลือก"}
-    </b>
-  </p>
+        <div className="dry-options-row">
+          <span>ระดับการอบ</span>
+          <strong>{temperatureName}</strong>
+        </div>
 
-  <p>
-    👔 ลดรอยยับ:{" "}
-    <b>{dry3WrinkleOption ? "ใช้" : "ไม่ใช้"}</b>
-  </p>
+        <div className="dry-options-row">
+          <span>ลดรอยยับ</span>
+          <strong>
+            {dry3WrinkleOption ? "ใช้" : "ไม่ใช้"}
+          </strong>
+        </div>
 
-  <hr style={{ margin: "10px 0" }} />
-
-  <h2 style={{ color: "#2563eb" }}>
-    รวม: {getDry3TotalPrice()} บาท
-  </h2>
-</div>
-
-{dry3program !== 8 && (
-      <div style={{ marginBottom: "20px" }}>
-        <h4>อุณหภูมิการอบ</h4>
-
-        <button
-          onClick={() => setDry3TemperatureOption("normal")}
-        >
-          ปกติ +0 บาท
-        </button>
-
-        <button
-          onClick={() => setDry3TemperatureOption("medium")}
-        >
-          กลาง +5 บาท
-        </button>
-
-        <button
-          onClick={() => setDry3TemperatureOption("high")}
-        >
-          สูง +10 บาท
-        </button>
-      </div>
-)}
-{dry3program === 8 && (
-  <div style={{ marginBottom: "20px" }}>
-    <h4>อุณหภูมิการอบ</h4>
-    <p>โปรแกรมนี้ไม่สามารถปรับอุณหภูมิได้</p>
-  </div>
-)}
-
-
-
-      <div style={{ marginBottom: "20px" }}>
-        <h4>ลดรอยยับ</h4>
-
-        <button
-          onClick={() =>
-            setDry3WrinkleOption(!dry3WrinkleOption)
-          }
-        >
-          {dry3WrinkleOption
-            ? "ลดรอยยับ +8 บาท ✓"
-            : "ลดรอยยับ +8 บาท"}
-        </button>
+        <div className="dry-options-total">
+          <span>ยอดชำระทั้งหมด</span>
+          <strong>
+            {getDry3TotalPrice()} บาท
+          </strong>
+        </div>
       </div>
 
-      <button 
-        onClick={() => {
-          setDry3TemperatureOption(null);
-          setDry3WrinkleOption(false);
-          setStep(3_3_1);
-        }}
-      >
-        ย้อนกลับ
-      </button>
+      {/* ตัวเลือกระดับการอบ */}
+      <div className="dry-options-section">
+        <h3>ระดับการอบ</h3>
 
+        {canAdjustTemperature ? (
+          <div className="dry-options-list">
+            {temperatureOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`dry-options-choice ${
+                  dry3TemperatureOption === option.value
+                    ? "selected"
+                    : ""
+                }`}
+                onClick={() =>
+                  setDry3TemperatureOption(option.value)
+                }
+              >
+                <span className="dry-options-choice-name">
+                  <span
+                    className={`dry-options-radio ${
+                      dry3TemperatureOption === option.value
+                        ? "checked"
+                        : ""
+                    }`}
+                  />
+                  {option.name}
+                </span>
+
+                <span className="dry-options-choice-price">
+                  +{option.price} บาท
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="dry-options-notice">
+            โปรแกรมนี้ไม่สามารถปรับระดับการอบได้
+          </p>
+        )}
+      </div>
+
+      {/* ลดรอยยับ */}
+      <div className="dry-options-section">
+        <h3>ลดรอยยับ</h3>
+
+        <label className="dry-options-wrinkle">
+          <span className="dry-options-wrinkle-name">
+            <input
+              type="checkbox"
+              checked={dry3WrinkleOption}
+              onChange={(e) =>
+                setDry3WrinkleOption(e.target.checked)
+              }
+            />
+            ลดรอยยับ
+          </span>
+
+          <strong>+8 บาท</strong>
+        </label>
+      </div>
+
+      {/* ยืนยันการชำระเงิน */}
       <button
-        style={{
-          width: "100%",
-          padding: "15px",
-          fontSize: "18px",
-          background: "#22c55e",
-          color: "white",
-          border: "none",
-          borderRadius: "12px",
-          cursor: "pointer",
-          marginTop: "10px",
-        }}
+        type="button"
+        className="dry-options-confirm"
         onClick={async () => {
           if (!dry3price) {
             alert("กรุณาเลือกราคา");
@@ -153,13 +150,12 @@ function Dry3Options({
           }
 
           if (
-            dry3program !== 8 &&
+            canAdjustTemperature &&
             !dry3TemperatureOption
           ) {
-            alert("กรุณาเลือกอุณหภูมิ");
+            alert("กรุณาเลือกระดับการอบ");
             return;
           }
-
 
           if (
             !window.confirm(
@@ -176,9 +172,21 @@ function Dry3Options({
           setStep(STEP_QR);
         }}
       >
-        ยืนยันและชำระเงิน
+        ยืนยันและชำระเงิน →
       </button>
-    </>
+
+      <button
+        type="button"
+        className="machine-back"
+        onClick={() => {
+          setDry3TemperatureOption(null);
+          setDry3WrinkleOption(false);
+          setStep(3_3_1);
+        }}
+      >
+        ← ย้อนกลับ
+      </button>
+    </div>
   );
 }
 

@@ -46,6 +46,7 @@ function App() {
 
 
 const [step, setStep] = useState(1);
+const SHOW_TEST_BUTTONS = true;
 const [mode, setMode] = useState(null);
 const [selectedMachine, setSelectedMachine] = useState(null);
 const [reservedUntil, setReservedUntil] = useState(null);
@@ -144,6 +145,7 @@ const getDry1TotalPrice = () => {
 const getDry2TotalPrice = () => {
   return calculateDryTotalPrice({
     basePrice: dry2price,
+    program: dry2program,
     temperatureOption: dry2TemperatureOption,
     wrinkleOption: dry2WrinkleOption,
     dryerType: "dry2",
@@ -153,6 +155,7 @@ const getDry2TotalPrice = () => {
 const getDry3TotalPrice = () => {
   return calculateDryTotalPrice({
     basePrice: dry3price,
+    program: dry3program,
     temperatureOption: dry3TemperatureOption,
     wrinkleOption: dry3WrinkleOption,
     dryerType: "dry3",
@@ -162,6 +165,7 @@ const getDry3TotalPrice = () => {
 const getDry4TotalPrice = () => {
   return calculateDryTotalPrice({
     basePrice: dry4price,
+    program: dry4program,
     temperatureOption: dry4TemperatureOption,
     wrinkleOption: dry4WrinkleOption,
     dryerType: "dry4",
@@ -186,6 +190,29 @@ const getDry4TotalPrice = () => {
 const [programPrice, setProgramPrice] = useState(0);
 
 const STEP_QR = 99;
+
+const pageTitle =
+  step === 1
+    ? "ยินดีต้อนรับ"
+    : step === 1_1
+    ? "เลือกเครื่องซักผ้า"
+    : step === 1_2
+    ? "เลือกเครื่องอบผ้า"
+    : step === STEP_QR
+    ? "ชำระค่าบริการ"
+    : mode === "wash"
+    ? "เลือกโปรแกรมซักผ้า"
+    : "เลือกโปรแกรมอบผ้า";
+
+const pageDescription =
+  step === 1
+    ? "กรุณาเลือกบริการที่ต้องการ"
+    : step === 1_1 || step === 1_2
+    ? "กรุณาเลือกเครื่องที่ต้องการใช้บริการ"
+    : step === STEP_QR
+    ? "ตรวจสอบรายละเอียดและชำระค่าบริการ"
+    : "เลือกโปรแกรมและตัวเลือกที่ต้องการ";
+
 
 const getTotalPrice = () => {
 
@@ -453,12 +480,43 @@ const finishWash = (machine) => {
 
   
 
-  return (
 
-  <div style={{ padding: "40px" }}>
-    <h1>Smart Laundry</h1>
+return (
+  <div className="laundry-app">
+    <header className="laundry-header">
+      <div className="laundry-brand">
+        <div className="laundry-logo">🫧</div>
+        <div>
+          <h1>Smart Laundry</h1>
+          <p>บริการซักอบอัจฉริยะ สะดวกทุกเวลา</p>
+        </div>
+      </div>
 
-    <p>MQTT Status : {status}</p>
+      <div className="laundry-status">
+        <span
+          className={`laundry-dot ${
+            status === "Connected" ? "online" : ""
+          }`}
+        />
+        {status === "Connected"
+          ? "ระบบเชื่อมต่อแล้ว"
+          : "กำลังเชื่อมต่อระบบ"}
+      </div>
+    </header>
+
+    <main className="laundry-main">
+
+      <div className="laundry-intro">
+        <span className="laundry-eyebrow">
+          SELF SERVICE LAUNDRY
+        </span>
+        <h2>{pageTitle}</h2>
+        <p>{pageDescription}</p>
+      </div>
+
+
+      <div className="laundry-panel">
+
 
 {/* STEP 1 */}
 {step === 1 && (
@@ -475,6 +533,10 @@ const finishWash = (machine) => {
         setStep(1_2);
       }}
     />
+
+
+{SHOW_TEST_BUTTONS && (
+  <div className="test-controls">
 
     <br />
 <button onClick={() => finishWash("machine1")}>
@@ -510,6 +572,9 @@ const finishWash = (machine) => {
 <button onClick={() => finishWash("machine8")}>
   อบเสร็จ เครื่อง 4
 </button>
+
+  </div>
+)}
 
   </>
 )}
@@ -803,6 +868,8 @@ const finishWash = (machine) => {
     reservedUntil={reservedUntil}
   />
 )}
+      </div>
+    </main>
   </div>
   );
 }

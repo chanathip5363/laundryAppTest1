@@ -1,68 +1,1248 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/* Smart Laundry — consolidated styles */
+:root { font-family:'Noto Sans Thai','Segoe UI',Tahoma,sans-serif; color:#18324d; background:#f3f8fd; font-synthesis:none; text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased; }
+* { box-sizing:border-box; }
+body { margin:0; min-width:320px; min-height:100vh; }
+button,input,select { font:inherit; }
+button { cursor:pointer; transition:transform .18s,box-shadow .18s,background .18s; }
+button:hover:not(:disabled) { transform:translateY(-2px); }
+button:focus-visible,a:focus-visible { outline:3px solid #38bdf8; outline-offset:3px; }
+a { color:#0878c9; text-decoration:none; }
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+/* Shell and header */
+.laundry-app { min-height:100vh; background:radial-gradient(circle at 95% 0%,#d8efff 0,transparent 35%),#f3f8fd; }
+.laundry-header { background:linear-gradient(115deg,#102d54,#075f9e); color:white; padding:24px max(22px,calc((100vw - 1100px)/2)); display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; box-shadow:0 8px 24px #103b6a20; }
+.laundry-brand { display:flex; align-items:center; gap:14px; }
+.laundry-logo { width:52px; height:52px; border-radius:17px; display:grid; place-items:center; background:#ffffff22; font-size:29px; }
+.laundry-brand h1 { font-size:clamp(23px,3vw,32px); line-height:1.2; margin:0; }
+.laundry-brand p { margin:5px 0 0; color:#d5edff; font-size:13px; }
+.laundry-status { display:flex; align-items:center; gap:9px; border-radius:30px; padding:10px 15px; background:#ffffff20; font-size:13px; }
+.laundry-dot { width:9px; height:9px; border-radius:50%; background:#ffca70; }
+.laundry-dot.online { background:#64e5b1; box-shadow:0 0 0 4px #64e5b124; }
+.laundry-main { max-width:1100px; margin:0 auto; padding:35px 20px 60px; }
+.laundry-intro { text-align:center; margin:0 auto 26px; }
+.laundry-eyebrow { font-size:12px; font-weight:800; letter-spacing:1.6px; color:#087cbd; text-transform:uppercase; }
+.laundry-intro h2 { font-size:clamp(28px,3vw,36px); font-weight:800; margin:9px 0 6px; color:#14355a; }
+.laundry-intro p { color:#71859b; margin:0; font-size:17px; }
+.laundry-panel { background:#fff; border:1px solid #e4eef8; border-radius:24px; padding:clamp(18px,3vw,34px); box-shadow:0 14px 42px #1d5c9212; }
+.laundry-panel button { border-radius:14px; }
+.laundry-panel button:not(:disabled) { min-height:44px; }
+.laundry-panel button:disabled { opacity:.5; cursor:not-allowed; }
+.laundry-footer { text-align:center; color:#91a3b5; font-size:12px; padding:0 20px 24px; }
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Service selection */
+.service-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
+.service-card { display:flex; flex-direction:column; align-items:flex-start; text-align:left; gap:14px; padding:32px; min-height:300px; border-radius:24px; border:1px solid #dceaf8; background:linear-gradient(145deg,#fff,#edf7ff); color:#173b60; box-shadow:0 10px 28px #174c7912; transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
+.service-card:hover:not(:disabled) { transform:translateY(-4px); box-shadow:0 18px 38px #174c7924; border-color:#7bc5f5; }
+.dry-card {
+  background: linear-gradient(145deg, #ffffff, #fff3e6);
+  border-color: #f2d4a6;
+}
+.service-icon { display:grid; place-items:center; width:76px; height:76px; border-radius:22px; background:#dcefff; font-size:38px; color:#087bc2; }
+.dry-card .service-icon { background:#e4eaff; color:#3154a4; }
+.service-title { font-size:32px; font-weight:800; }
+.service-description { font-size:16px; color:#71869a; line-height:1.7; }
+.service-action { margin-top:auto; width:100%; display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-radius:13px; background:#087bc2; color:white; font-weight:700; font-size:16px; min-height:54px; }
+.dry-card .service-action {
+  background: #d97706;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* Machine selection */
+.machine-selection { width:100%; }
+.machine-heading { text-align:center; margin-bottom:28px; }
+.machine-heading h2 { font-size:26px; font-weight:800; color:#123b66; margin-bottom:8px; }
+.machine-heading p { font-size:16px; color:#71869a; }
+.machine-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.machine-card { display:flex; flex-direction:column; align-items:center; gap:12px; padding:28px 20px; border:1px solid #dceaf8; border-radius:20px; background:linear-gradient(145deg,#fff,#eef7ff); color:#087bc2; cursor:pointer; transition:transform .2s,box-shadow .2s; }
+.machine-card:hover:not(:disabled) { transform:translateY(-4px); box-shadow:0 12px 28px #174c7924; border-color:#7bc5f5; }
+.machine-card-icon { display:grid; place-items:center; width:86px; height:86px; border-radius:24px; background:#dcefff; font-size:42px; }
+.machine-card-title { font-size:25px; font-weight:800; color:#123b66; }
+.machine-card-model { font-size:17px; color:#71869a; }
+.machine-card-action { width:100%; margin-top:10px; padding:14px; border-radius:12px; background:#087bc2; color:white; font-size:17px; font-weight:700; text-align:center; min-height:52px; display:flex; align-items:center; justify-content:center; }
+
+/* Dryer machine - Warm Amber Theme */
+
+.machine-card.dryer-machine:not(:disabled) {
+  color: #d97706;
+  background: linear-gradient(145deg, #ffffff, #fff3e6);
+  border-color: #f2d4a6;
 }
 
-body {
+.machine-card.dryer-machine:not(:disabled) .machine-card-icon {
+  background: #fff0d9;
+  color: #d97706;
+}
+
+.machine-card.dryer-machine:not(:disabled) .machine-card-title {
+  color: #9a3412;
+}
+
+.machine-card.dryer-machine:not(:disabled) .machine-card-action {
+  background: #d97706;
+  color: white;
+}
+
+.machine-card.dryer-machine:not(:disabled):hover {
+  background: #fff4e5;
+  border-color: #d97706;
+}
+
+.machine-back { display:block; margin:28px auto 0; padding:12px 30px; border:1px solid #dceaf8; border-radius:12px; background:white; color:#315b80; font-size:17px; font-weight:600; cursor:pointer; min-height:48px; }
+.machine-state { display:inline-flex; justify-content:center; align-items:center; padding:7px 16px; border-radius:999px; font-size:15px; font-weight:700; }
+.machine-state.ready { background:#dcfce7; color:#15803d; }
+.machine-state.busy { background:#fef3c7; color:#92400e; }
+.machine-state.offline,.machine-state.unknown { background:#e5e7eb; color:#64748b; }
+.machine-card:disabled { cursor:not-allowed; opacity:.68; transform:none; box-shadow:none; }
+.machine-card:disabled .machine-card-action { background:#94a3b8; }
+.machine-error { text-align:center; color:#b91c1c; background:#fef2f2; padding:14px; border-radius:12px; margin-bottom:20px; }
+
+/* Mobile layout — consolidated final values */
+@media (max-width:650px) {
+  .laundry-header { padding:12px 16px; gap:8px; }
+  .laundry-brand h1 { font-size:20px; }
+  .laundry-brand p { font-size:11px; }
+  .laundry-logo { width:40px; height:40px; }
+  .laundry-status { padding:8px 12px; }
+  .laundry-main { width:calc(100% - 20px); margin:0 auto; padding:25px 12px 40px; }
+  .laundry-panel { padding:10px; border-radius:18px; }
+  .laundry-intro { text-align:center; margin:4px auto 10px; padding:4px 0; }
+  .laundry-intro h2 { font-size:24px; margin:3px 0; }
+  .laundry-intro p { font-size:13px; }
+  .service-grid { grid-template-columns:1fr; gap:8px; }
+  .service-card { min-height:0; padding:14px; gap:7px; border-radius:18px; }
+  .service-icon { width:48px; height:48px; border-radius:15px; }
+  .service-icon svg { width:30px; height:30px; }
+  .service-title { font-size:22px; line-height:1.3; }
+  .service-description { font-size:14px; line-height:1.5; }
+  .service-action { margin-top:4px; min-height:44px; padding:10px 14px; font-size:14px; }
+  .machine-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .machine-card { min-width:0; min-height:215px; padding:14px 9px; gap:9px; border-radius:15px; }
+  .machine-card-icon { width:56px; height:56px; border-radius:16px; }
+  .machine-card-icon svg { width:36px; height:36px; }
+  .machine-card-title { font-size:17px; }
+  .machine-card-model { font-size:12px; }
+  .machine-state { font-size:11px; padding:5px 8px; }
+  .machine-card-action { min-height:42px; padding:8px 4px; font-size:12px; }
+  .machine-back { margin-top:18px; min-height:44px; font-size:14px; }
+}
+@media (prefers-reduced-motion:reduce) { button { transition:none; } button:hover:not(:disabled) { transform:none; } }
+
+
+/* =====================================
+   WASH PRICE SELECTION
+===================================== */
+
+.wash-price-selection {
+  width: 100%;
+}
+
+.wash-price-heading {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.wash-price-heading p {
   margin: 0;
+  color: #71869a;
+  font-size: 15px;
+}
+
+.wash-price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.wash-price-card {
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid #dceaf8;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 6px 20px #174c790d;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.wash-price-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+.wash-price-info h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: #123b66;
+}
+
+.wash-price-info p {
+  margin: 0;
+  color: #71869a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wash-price-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #eaf6ff;
+  color: #087bc2;
+  white-space: nowrap;
+}
+
+.wash-price-amount strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.wash-price-amount span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wash-price-details {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+  border-top: 1px solid #edf2f7;
+  padding-top: 16px;
+}
+
+.wash-price-detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #415a73;
+}
+
+.wash-price-check {
+  color: #16a34a;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.wash-price-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #087bc2;
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.wash-price-card.standard .wash-price-amount {
+  background: #eef2ff;
+  color: #3154a4;
+}
+
+.wash-price-card.standard .wash-price-button {
+  background: #3154a4;
+}
+
+.wash-price-card.premium .wash-price-amount {
+  background: #fff5e8;
+  color: #a16207;
+}
+
+.wash-price-card.premium .wash-price-button {
+  background: #a16207;
+}
+
+@media (max-width: 800px) {
+  .wash-price-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .wash-price-card {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .wash-price-info h3 {
+    font-size: 18px;
+  }
+
+  .wash-price-amount strong {
+    font-size: 28px;
+  }
+
+  .wash-price-details {
+    gap: 7px;
+    padding-top: 12px;
+  }
+
+  .wash-price-detail {
+    font-size: 13px;
+  }
+
+  .wash-price-button {
+    min-height: 46px;
+    font-size: 14px;
+  }
+}
+
+
+/* =====================================
+   WASH 20 SELECTION
+===================================== */
+
+.wash20-selection {
+  width: 100%;
+  max-width: 650px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wash20-heading {
+  text-align: center;
+}
+
+.wash20-heading h2 {
+  margin: 0 0 4px;
+  color: #123b66;
+  font-size: 23px;
+}
+
+.wash20-heading p {
+  margin: 0;
+  color: #71869a;
+  font-size: 14px;
+}
+
+.wash20-program-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wash20-program-card {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 112px;
+  padding: 16px;
+  gap: 14px;
+  border: 2px solid #dceaf8;
+  border-radius: 16px;
+  background: #ffffff;
+  text-align: left;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  color: #123b66;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+.wash20-program-card.selected {
+  border-color: #087bc2;
+  background: #eff8ff;
+}
+
+.wash20-program-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #e2f2ff;
+  font-size: 25px;
+}
+
+.wash20-program-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.wash20-program-content strong {
+  font-size: 17px;
+}
+
+.wash20-program-content small {
+  color: #71869a;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.wash20-duration {
+  color: #087bc2;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wash20-program-radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #b8cce0;
+  border-radius: 50%;
+  color: white;
+}
+
+.wash20-program-card.selected .wash20-program-radio {
+  background: #087bc2;
+  border-color: #087bc2;
+}
+
+.wash20-summary {
+  padding: 18px;
+  border: 1px solid #dceaf8;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.wash20-summary h3 {
+  margin: 0 0 16px;
+  color: #123b66;
+  font-size: 18px;
+}
+
+.wash20-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.wash20-summary-row > span {
+  color: #71869a;
+}
+
+.wash20-summary-row strong {
+  text-align: right;
+  color: #123b66;
+}
+
+.wash20-summary-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #dceaf8;
+}
+
+.wash20-summary-total span {
+  color: #087bc2;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.wash20-confirm {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #16a34a;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wash20-back {
+  align-self: center;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1px solid #dceaf8;
+  border-radius: 12px;
+  background: white;
+  color: #123b66;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@media (max-width: 650px) {
+  .wash20-selection {
+    gap: 12px;
   }
-  a:hover {
-    color: #747bff;
+
+  .wash20-program-card {
+    min-height: 96px;
+    padding: 12px;
+    gap: 10px;
   }
-  button {
-    background-color: #f9f9f9;
+
+  .wash20-program-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 22px;
   }
+
+  .wash20-program-content strong {
+    font-size: 15px;
+  }
+
+  .wash20-summary {
+    padding: 14px;
+  }
+}
+
+
+/* =====================================
+   WASH 30 PROGRAM SELECTION
+===================================== */
+
+.wash30-selection {
+  width: 100%;
+  max-width: 650px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wash30-subtitle {
+  margin: 0;
+  text-align: center;
+  color: #71869a;
+  font-size: 14px;
+}
+
+.wash30-program-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wash30-program-card {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 86px;
+  padding: 14px;
+  gap: 14px;
+  border: 1px solid #dceaf8;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #123b66;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.wash30-program-card:hover {
+  border-color: #087bc2;
+  background: #f3faff;
+}
+
+.wash30-program-card:focus-visible {
+  outline: 3px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+.wash30-program-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #eaf6ff;
+  font-size: 24px;
+}
+
+.wash30-program-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.wash30-program-content strong {
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.wash30-program-content small {
+  color: #71869a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.wash30-program-arrow {
+  flex-shrink: 0;
+  color: #087bc2;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.wash30-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #eff8ff;
+  color: #315b80;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wash30-note > span:first-child {
+  color: #087bc2;
+  font-size: 18px;
+}
+
+@media (max-width: 650px) {
+  .wash30-selection {
+    gap: 12px;
+  }
+
+  .wash30-program-card {
+    min-height: 76px;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .wash30-program-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 22px;
+  }
+
+  .wash30-program-content strong {
+    font-size: 15px;
+  }
+
+  .wash30-program-content small {
+    font-size: 12px;
+  }
+}
+
+
+/* =====================================
+   WASH 30 OPTIONS
+===================================== */
+
+.wash30-options {
+  width: 100%;
+  max-width: 650px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wash30-options-program {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #eff8ff;
+}
+
+.wash30-options-program span {
+  font-size: 13px;
+  color: #71869a;
+}
+
+.wash30-options-program strong {
+  font-size: 18px;
+  color: #123b66;
+}
+
+.wash30-options-section {
+  padding: 18px;
+  border: 1px solid #dceaf8;
+  border-radius: 16px;
+  background: white;
+}
+
+.wash30-options-section h3 {
+  margin: 0 0 5px;
+  font-size: 18px;
+  color: #123b66;
+}
+
+.wash30-options-section > p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #71869a;
+}
+
+.wash30-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.wash30-option-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  min-height: 50px;
+  border: 2px solid #e2eaf3;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.wash30-option-item.selected {
+  border-color: #087bc2;
+  background: #eff8ff;
+}
+
+.wash30-option-item input {
+  width: 19px;
+  height: 19px;
+  accent-color: #087bc2;
+  flex-shrink: 0;
+}
+
+.wash30-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wash30-option-text strong {
+  color: #123b66;
+  font-size: 15px;
+}
+
+.wash30-option-text small {
+  color: #71869a;
+  font-size: 12px;
+}
+
+.wash30-options-summary {
+  padding: 18px;
+  border: 1px solid #dceaf8;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.wash30-options-summary h3 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  color: #123b66;
+}
+
+.wash30-options-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.wash30-options-row span {
+  color: #71869a;
+}
+
+.wash30-options-row strong {
+  color: #123b66;
+  text-align: right;
+}
+
+.wash30-options-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 15px;
+  border-top: 1px solid #dceaf8;
+}
+
+.wash30-options-total strong {
+  color: #123b66;
+}
+
+.wash30-options-total span {
+  color: #087bc2;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.wash30-options-confirm {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 12px;
+  background: #16a34a;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 650px) {
+  .wash30-options {
+    gap: 12px;
+  }
+
+  .wash30-options-section,
+  .wash30-options-summary {
+    padding: 14px;
+  }
+
+  .wash30-option-item {
+    padding: 11px;
+  }
+}
+
+
+/* =====================================
+   WASH 50 SELECTION
+===================================== */
+
+.wash50-selection {
+  width: 100%;
+  max-width: 650px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wash50-program {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #f0dfc5;
+  border-radius: 16px;
+  background: #fffaf2;
+}
+
+.wash50-program-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #fff0d9;
+  font-size: 28px;
+}
+
+.wash50-program-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wash50-program-info strong {
+  color: #123b66;
+  font-size: 18px;
+}
+
+.wash50-program-info span {
+  color: #71869a;
+  font-size: 13px;
+}
+
+.wash50-program-info small {
+  color: #a16207;
+  font-size: 12px;
+}
+
+@media (max-width: 650px) {
+  .wash50-selection {
+    gap: 12px;
+  }
+
+  .wash50-program {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .wash50-program-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .wash50-program-info strong {
+    font-size: 16px;
+  }
+}
+
+
+/* =====================================
+   DRY PRICE SELECTION
+===================================== */
+
+.dry-price-selection {
+  width: 100%;
+}
+
+.dry-price-description {
+  text-align: center;
+  color: #71869a;
+  font-size: 16px;
+  margin: 0 0 24px;
+}
+
+.dry-price-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.dry-price-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  gap: 10px;
+  padding: 22px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #f2d4a6;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #ffffff, #fff8ee);
+  color: #713f12;
+}
+
+.dry-price-card:hover:not(:disabled) {
+  border-color: #d97706;
+  box-shadow: 0 10px 26px #d9770620;
+}
+
+.dry-price-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dry-price-card-name {
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.dry-price-card-amount {
+  font-size: 23px;
+  font-weight: 800;
+  color: #c26a06;
+}
+
+.dry-price-card-time {
+  font-size: 16px;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.dry-price-card-details {
+  font-size: 15px;
+  color: #71869a;
+  line-height: 1.6;
+}
+
+.dry-price-card-action {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #d97706;
+  color: #ffffff;
+  text-align: center;
+  font-weight: 700;
+}
+
+
+/* =====================================
+   DRY PROGRAM SELECTION
+===================================== */
+
+.dry-program-selection {
+  width: 100%;
+}
+
+.dry-program-heading {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.dry-program-heading p {
+  color: #71869a;
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.dry-program-price {
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: #fff0d9;
+  color: #9a3412;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dry-program-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.dry-program-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid #f2d4a6;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #ffffff, #fff8ee);
+  color: #713f12;
+  text-align: left;
+}
+
+.dry-program-card:hover:not(:disabled) {
+  border-color: #d97706;
+  box-shadow: 0 8px 22px #d9770620;
+}
+
+.dry-program-card-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #fff0d9;
+  color: #d97706;
+  font-size: 27px;
+}
+
+.dry-program-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dry-program-card-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: #9a3412;
+}
+
+.dry-program-card-code {
+  font-size: 13px;
+  color: #8b9aab;
+}
+
+.dry-program-card-arrow {
+  flex-shrink: 0;
+  font-size: 23px;
+  font-weight: 700;
+  color: #d97706;
+}
+
+
+/* =====================================
+   DRY OPTIONS - AMBER THEME
+===================================== */
+
+.dry-options {
+  width: 100%;
+}
+
+.dry-options-program-name {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: #9a3412;
+  margin: 0 0 20px;
+}
+
+.dry-options-summary {
+  padding: 22px;
+  border: 1px solid #f2d4a6;
+  border-radius: 18px;
+  background: #fffaf3;
+  margin-bottom: 20px;
+}
+
+.dry-options-summary h3 {
+  margin: 0 0 18px;
+  font-size: 19px;
+  color: #9a3412;
+}
+
+.dry-options-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  font-size: 15px;
+  color: #71869a;
+}
+
+.dry-options-row strong {
+  color: #713f12;
+  text-align: right;
+}
+
+.dry-options-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 18px;
+  border-top: 1px solid #f2d4a6;
+  font-weight: 700;
+  color: #713f12;
+}
+
+.dry-options-total strong {
+  font-size: 25px;
+  color: #c26a06;
+}
+
+.dry-options-section {
+  padding: 20px;
+  margin-bottom: 18px;
+  border: 1px solid #f2d4a6;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.dry-options-section h3 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  color: #9a3412;
+}
+
+.dry-options-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dry-options-choice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #f2d4a6;
+  border-radius: 12px;
+  background: #fffaf3;
+  color: #713f12;
+  text-align: left;
+}
+
+.dry-options-choice.selected {
+  border-color: #d97706;
+  background: #fff0d9;
+}
+
+.dry-options-choice-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.dry-options-radio {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  border: 2px solid #d97706;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.dry-options-radio.checked {
+  background: #d97706;
+  box-shadow: inset 0 0 0 4px #ffffff;
+}
+
+.dry-options-choice-price {
+  font-weight: 700;
+  white-space: nowrap;
+  color: #c26a06;
+}
+
+.dry-options-notice {
+  margin: 0;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff8ee;
+  color: #9a3412;
+  font-size: 15px;
+}
+
+.dry-options-wrinkle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid #f2d4a6;
+  border-radius: 12px;
+  background: #fffaf3;
+  cursor: pointer;
+}
+
+.dry-options-wrinkle-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+  color: #713f12;
+}
+
+.dry-options-wrinkle input {
+  width: 20px;
+  height: 20px;
+  accent-color: #d97706;
+}
+
+.dry-options-wrinkle strong {
+  color: #c26a06;
+}
+
+.dry-options-confirm {
+  width: 100%;
+  min-height: 54px;
+  padding: 15px;
+  border: none;
+  border-radius: 12px;
+  background: #d97706;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.dry-options-confirm:hover:not(:disabled) {
+  background: #b45309;
 }

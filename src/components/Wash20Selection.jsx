@@ -1,4 +1,5 @@
-﻿function Wash20Selection({
+﻿
+function Wash20Selection({
   program,
   programNameMap,
   getTotalPrice,
@@ -13,106 +14,132 @@
   STEP_QR,
   priceGroupPrograms,
 }) {
+  const programDetails = {
+    quick: {
+      description: "เหมาะสำหรับผ้าที่ไม่สกปรกมาก",
+      duration: "15 นาที",
+    },
+    eco: {
+      description: "ซักทั่วไปด้วยโปรแกรมประหยัด",
+      duration: "57 นาที",
+    },
+  };
+
+  const getProgramDetail = (programId) => {
+    const name = programNameMap[programId] || "";
+
+    if (name.includes("ด่วน")) return programDetails.quick;
+    if (name.includes("ประหยัด")) return programDetails.eco;
+
+    return { description: "เลือกโปรแกรมซัก", duration: "" };
+  };
+
+  const handleConfirm = async () => {
+    if (!program) {
+      alert("กรุณาเลือกโปรแกรม");
+      return;
+    }
+
+    const cmd = buildCommand();
+    console.log(cmd);
+
+    if (!window.confirm(
+      `ยืนยันชำระ ${getTotalPrice()} บาท ?`
+    )) {
+      return;
+    }
+
+    const ok = await checkMachineBeforePay();
+    if (!ok) return;
+
+    setStep(STEP_QR);
+  };
+
   return (
-    <>
-      <h2 style={{ marginBottom: "10px" }}>
-        {programNameMap[program] ?? "เลือกโปรแกรมซัก"}
-      </h2>
+    <div className="wash20-selection">
+    <div className="wash20-heading">
+      <p>แพ็กเกจซักประหยัด 20 บาท</p>
+    </div>
 
-      <div
-        style={{
-          border: "1px solid #e5e7eb",
-          padding: "20px",
-          borderRadius: "16px",
-          marginBottom: "20px",
-          background: "#ffffff",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-        }}
-      >
-        <h3 style={{ marginBottom: "10px" }}>
-          🧾 สรุปรายการ
-        </h3>
+      <div className="wash20-program-list">
+        {priceGroupPrograms.map((programId) => {
+          const selected = program === programId;
+          const detail = getProgramDetail(programId);
 
-        <p>
-          🧺 โปรแกรม:{" "}
-          <b>{programNameMap[program] ?? "-"}</b>
-        </p>
+          return (
+            <button
+              key={programId}
+              type="button"
+              className={`wash20-program-card ${
+                selected ? "selected" : ""
+              }`}
+              aria-pressed={selected}
+              onClick={() => {
+                setProgram(programId);
+                setProgramPrice(20);
+                setSpin(0);
+                setAroma(0);
+              }}
+            >
+              <span className="wash20-program-icon">
+                {detail.duration === "15 นาที" ? "⏱" : "🌿"}
+              </span>
 
-        <p>
-          🌡️ อุณหภูมิ: <b>ปกติ</b>
-        </p>
+              <span className="wash20-program-content">
+                <strong>{programNameMap[programId]}</strong>
+                <small>{detail.description}</small>
+                <span className="wash20-duration">
+                  ◷ {detail.duration}
+                </span>
+              </span>
 
-        <hr style={{ margin: "10px 0" }} />
-
-        <h2 style={{ color: "#2563eb" }}>
-          รวม: {getTotalPrice()} บาท
-        </h2>
+              <span className="wash20-program-radio">
+                {selected ? "✓" : ""}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-{priceGroupPrograms.map((programId) => (
-  <button
-    key={programId}
-    onClick={() => {
-      setProgram(programId);
-      setProgramPrice(20);
-      setSpin(0);
-      setAroma(0);
-    }}
-  >
-    {programNameMap[programId]}
-  </button>
-))}
+      <div className="wash20-summary">
+        <h3>สรุปรายการ</h3>
 
-      <br />
+        <div className="wash20-summary-row">
+          <span>โปรแกรม</span>
+          <strong>{programNameMap[program] ?? "ยังไม่ได้เลือก"}</strong>
+        </div>
+
+        <div className="wash20-summary-row">
+          <span>อุณหภูมิ</span>
+          <strong>ปกติ</strong>
+        </div>
+
+        <div className="wash20-summary-total">
+          <strong>ยอดชำระ</strong>
+          <span>{getTotalPrice()} บาท</span>
+        </div>
+      </div>
 
       <button
+        type="button"
+        className="wash20-confirm"
+        onClick={handleConfirm}
+      >
+        ยืนยันและชำระเงิน →
+      </button>
+
+      <button
+        type="button"
+        className="wash20-back"
         onClick={() => {
           resetOptions();
           setProgram(0);
           setStep(2);
         }}
       >
-        ย้อนกลับ
+        ← ย้อนกลับ
       </button>
-
-      <button
-        style={{
-          width: "100%",
-          padding: "15px",
-          fontSize: "18px",
-          background: "#22c55e",
-          color: "white",
-          border: "none",
-          borderRadius: "12px",
-          cursor: "pointer",
-          marginTop: "10px",
-        }}
-        onClick={async () => {
-          const cmd = buildCommand();
-          console.log(cmd);
-
-          if (!program) {
-            alert("กรุณาเลือกโปรแกรม");
-            return;
-          }
-
-          if (
-            !window.confirm(
-              `ยืนยันชำระ ${getTotalPrice()} บาท ?`
-            )
-          ) {
-            return;
-          }
-
-          const ok = await checkMachineBeforePay();
-          if (!ok) return;
-
-          setStep(STEP_QR);
-        }}
-      >
-        ยืนยันและชำระเงิน
-      </button>
-    </>
+    </div>
   );
 }
 

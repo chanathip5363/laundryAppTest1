@@ -1,3 +1,4 @@
+
 function Dry3ProgramSelection({
   dry3price,
   setDry3Program,
@@ -7,7 +8,6 @@ function Dry3ProgramSelection({
 }) {
   const programGroups = {
     30: [
-
       { program: 8, name: "ไม่ใช้ความร้อน" },
     ],
 
@@ -19,7 +19,6 @@ function Dry3ProgramSelection({
 
     50: [
       { program: 2, name: "ผ้าหลายชนิด" },
-
       { program: 4, name: "ชุดเครื่องนอน" },
     ],
   };
@@ -27,34 +26,60 @@ function Dry3ProgramSelection({
   const programs = programGroups[dry3price] || [];
 
   return (
-    <>
-      <h2>เลือกโปรแกรมอบ</h2>
+    <div className="dry-program-selection">
+      <div className="dry-program-heading">
+        <p>เลือกโปรแกรมที่เหมาะกับชนิดผ้าของคุณ</p>
 
-      {programs.map((item) => (
-        <button
-          key={item.program}
-          onClick={() => {
-            setDry3Program(item.program);
-            setDry3TemperatureOption(null);
-            setDry3WrinkleOption(false);
-            setStep(3_3_2);
-          }}
-        >
-          {item.program} - {item.name}
-        </button>
-      ))}
+        <span className="dry-program-price">
+          ราคาเริ่มต้น {dry3price} บาท
+        </span>
+      </div>
 
-      <br />
+      <div className="dry-program-list">
+        {programs.map((item) => (
+          <button
+            key={item.program}
+            type="button"
+            className="dry-program-card"
+            onClick={() => {
+              setDry3Program(item.program);
+              setDry3TemperatureOption(null);
+              setDry3WrinkleOption(false);
+              setStep(3_3_2);
+            }}
+          >
+            <span className="dry-program-card-icon">
+              <span aria-hidden="true">♨</span>
+            </span>
+
+            <span className="dry-program-card-content">
+              <span className="dry-program-card-name">
+                {item.name}
+              </span>
+
+              <span className="dry-program-card-code">
+                โปรแกรม {item.program}
+              </span>
+            </span>
+
+            <span className="dry-program-card-arrow">
+              →
+            </span>
+          </button>
+        ))}
+      </div>
 
       <button
+        type="button"
+        className="machine-back"
         onClick={() => {
           setDry3Program(0);
           setStep(3_3);
         }}
       >
-        ย้อนกลับ
+        ← ย้อนกลับ
       </button>
-    </>
+    </div>
   );
 }
 
