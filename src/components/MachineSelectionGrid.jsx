@@ -75,7 +75,7 @@ export default function MachineSelectionGrid({
 
       try {
         const response = await fetch(
-          "http://localhost:3000/machines",
+          "https://82-26-104-220.sslip.io/machines",
           { cache: "no-store" }
         );
 
