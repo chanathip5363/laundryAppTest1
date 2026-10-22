@@ -496,7 +496,8 @@ db.run(`
     bank_time TEXT,
     receiving_account TEXT,
     amount_satang INTEGER,
-    parse_status TEXT NOT NULL DEFAULT 'UNPARSED'
+    parse_status TEXT NOT NULL DEFAULT 'UNPARSED',
+    is_test INTEGER NOT NULL DEFAULT 0
   )
 `, (err) => {
   if (err) {

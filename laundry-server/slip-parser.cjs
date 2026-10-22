@@ -19,35 +19,56 @@ function parseSlip(ocr) {
     "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
   ];
 
-  const date = ascii(ocr.dateLine).trim().match(
-    /^(\d{1,2})\s+(\S+)\s+(\d{2}|\d{4}),?\s+(\d{2}):(\d{2})\s*น\.?$/
-  );
+  function parseDateLine(value) {
+    const date = ascii(value).trim().match(
+      /^(\d{1,2})\s+(\S+)\s+(\d{2}|\d{4}),?\s+(\d{2}):(\d{2})\s*น\.?$/
+    );
+    if (!date) return null;
 
-  if (date) {
     const day = Number(date[1]);
     const month = months.indexOf(date[2]);
     const buddhistYear = date[3].length === 2
-      ? 2500 + Number(date[3])
-      : Number(date[3]);
+      ? 2500 + Number(date[3]) : Number(date[3]);
     const year = buddhistYear - 543;
     const hour = Number(date[4]);
     const minute = Number(date[5]);
     const check = new Date(Date.UTC(year, month, day));
 
     if (
-      month >= 0 && buddhistYear >= 2500 &&
-      hour < 24 && minute < 60 &&
-      check.getUTCFullYear() === year &&
-      check.getUTCMonth() === month &&
-      check.getUTCDate() === day
-    ) {
-      result.transferDate =
-        `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      result.transferTime = `${date[4]}:${date[5]}`;
+      month < 0 || buddhistYear < 2500 ||
+      hour >= 24 || minute >= 60 ||
+      check.getUTCFullYear() !== year ||
+      check.getUTCMonth() !== month ||
+      check.getUTCDate() !== day
+    ) return null;
+
+    return {
+      transferDate: [
+        year,
+        String(month + 1).padStart(2, "0"),
+        String(day).padStart(2, "0")
+      ].join("-"),
+      transferTime: date[4] + ":" + date[5]
+    };
+  }
+
+  const dateOptions = new Map();
+
+  for (const line of [ocr.dateLineFirst, ocr.dateLine]) {
+    const parsed = parseDateLine(line);
+    if (parsed) {
+      dateOptions.set(
+        parsed.transferDate + " " + parsed.transferTime,
+        parsed
+      );
     }
   }
 
-  if (!result.transferDate) warnings.push("DATE_INVALID");
+  if (dateOptions.size === 1) {
+    Object.assign(result, [...dateOptions.values()][0]);
+  } else {
+    warnings.push(dateOptions.size > 1 ? "DATE_CONFLICT" : "DATE_INVALID");
+  }
 
   const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
   const dateIndexes = lines.flatMap(
