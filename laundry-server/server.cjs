@@ -619,3 +619,10 @@ app.post("/sms-incoming", (req, res) => {
     }
   );
 });
+
+
+// ===== API สร้างรายการชำระและจองเครื่อง =====
+app.use(
+  "/payments",
+  require("./payment-api.cjs").createPaymentRouter()
+);
