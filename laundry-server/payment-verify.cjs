@@ -5,7 +5,11 @@ async function verifyPendingPayment(txid, slip, {
   dbPath = path.join(__dirname, "database.db"),
   isTest = false
 } = {}) {
+  const sourceBank = slip?.sourceBank ?? "TTB";
+
   if (
+    !["TTB", "BBL"].includes(sourceBank) ||
+    (sourceBank === "BBL" && slip?.receivingWalletId !== "004999254312902") ||
     typeof txid !== "string" || !txid ||
     typeof isTest !== "boolean" ||
     !slip ||
@@ -87,7 +91,7 @@ async function verifyPendingPayment(txid, slip, {
 
     if (existing) {
       if (
-        existing.slip_bank !== "TTB" ||
+        existing.slip_bank !== sourceBank ||
         existing.slip_reference !== slip.reference ||
         existing.amount_satang !== order.amount_satang ||
         !["PAID", "STARTING", "STARTED", "START_FAILED"].includes(order.status)
@@ -145,8 +149,8 @@ async function verifyPendingPayment(txid, slip, {
     const used = await get(
       `SELECT txid FROM payment_receipts
        WHERE sms_id = ?
-          OR (slip_bank = 'TTB' AND slip_reference = ?)`,
-      [smsId, slip.reference]
+          OR (slip_bank = ? AND slip_reference = ?)`,
+      [smsId, sourceBank, slip.reference]
     );
     if (used) throw new Error("EVIDENCE_ALREADY_USED");
 
@@ -159,8 +163,8 @@ async function verifyPendingPayment(txid, slip, {
       `INSERT INTO payment_receipts
        (txid, sms_id, slip_bank, slip_reference,
         amount_satang, verified_at)
-       VALUES (?, ?, 'TTB', ?, ?, ?)`,
-      [txid, smsId, slip.reference, order.amount_satang, verifiedAt]
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [txid, smsId, sourceBank, slip.reference, order.amount_satang, verifiedAt]
     );
 
     const updated = await run(

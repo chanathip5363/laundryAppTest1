@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { prepareQrImage, saveQrImage } from '../utils/saveQrImage';
 
 function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
   setStep, setProgramPrice, resetOptions }) {
@@ -10,6 +11,50 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  const [qrImage, setQrImage] = useState(null);
+  const [qrSaving, setQrSaving] = useState(false);
+  const [qrSaveError, setQrSaveError] = useState('');
+  const qrSaveLock = useRef(false);
+  const qrUrl = session ? generateQR(session.amount) : '';
+  const qrFilename = session ? `laundry-qr-${session.txid}.png` : '';
+
+  useEffect(() => {
+    setQrImage(null);
+    setQrSaveError('');
+    if (!qrUrl) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    let active = true;
+    prepareQrImage(qrUrl, qrFilename, { signal: controller.signal })
+      .then(image => { if (active) setQrImage(image); })
+      .catch(() => {
+        if (active) setQrSaveError('เตรียมภาพสำหรับบันทึกไม่สำเร็จ กดเปิดภาพ QR ด้านล่างได้');
+      })
+      .finally(() => clearTimeout(timeout));
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [qrUrl, qrFilename]);
+
+  async function saveQR() {
+    if (qrSaveLock.current || !qrImage || !session ||
+        busy || Date.now() >= session.reservedUntil) return;
+    qrSaveLock.current = true;
+    setQrSaving(true);
+    setQrSaveError('');
+    try {
+      await saveQrImage(qrImage);
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        setQrSaveError('บันทึกภาพไม่สำเร็จ กดเปิดภาพ QR ด้านล่างแล้วบันทึกภาพ');
+      }
+    } finally {
+      qrSaveLock.current = false;
+      setQrSaving(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -77,8 +122,20 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
 
   return <>
     <h2>ชำระเงิน</h2>
-    <img src={generateQR(session.amount)} alt="QR พร้อมเพย์ชำระค่าบริการ"
+    <img src={qrUrl} alt="QR พร้อมเพย์ชำระค่าบริการ"
       style={{ width: '250px' }} />
+    <div style={{ margin: '12px 0' }}>
+      <button type="button" onClick={saveQR}
+        disabled={!qrImage || qrSaving || busy || expired}>
+        {qrSaving ? 'กำลังบันทึก…' : !qrImage && !qrSaveError
+          ? 'กำลังเตรียมภาพ QR…' : 'บันทึก QR'}
+      </button>
+      <p>หากมีเมนูแชร์ ให้เลือกบันทึกภาพ แล้วชำระภายในเวลาที่เหลือ</p>
+      {qrSaveError && <>
+        <p role="alert">{qrSaveError}</p>
+        <a href={qrUrl} target="_blank" rel="noopener noreferrer">เปิดภาพ QR เพื่อบันทึก</a>
+      </>}
+    </div>
     <h2>{session.amount.toFixed(2)} บาท</h2>
     <h3>เหลือเวลา {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</h3>
     <p>ตรวจสอบชื่อผู้รับและยอดในแอปธนาคารก่อนยืนยันโอน แล้วแนบสลิป</p>
