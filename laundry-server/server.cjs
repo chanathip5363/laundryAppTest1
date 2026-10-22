@@ -506,6 +506,15 @@ db.run(`
   }
 });
 
+
+db.run(
+  "CREATE UNIQUE INDEX IF NOT EXISTS sms_messages_raw_text_unique ON sms_messages(raw_text)",
+  (err) => {
+    if (err) console.error("[SMS INDEX ERROR]", err.message);
+    else console.log("[SMS] Duplicate protection ready");
+  }
+);
+
 app.post("/sms-incoming", (req, res) => {
   if (req.get("X-SMS-Token") !== smsToken) {
     return res.status(401).json({
@@ -545,7 +554,9 @@ app.post("/sms-incoming", (req, res) => {
       bankTime = match[2];
       receivingAccount = match[3];
       amountSatang = amount;
-      parseStatus = "PARSED";
+      parseStatus = receivingAccount === "X-4891"
+        ? "PARSED"
+        : "ACCOUNT_MISMATCH";
     }
   }
 
@@ -560,6 +571,32 @@ app.post("/sms-incoming", (req, res) => {
     ],
     function (err) {
       if (err) {
+        
+        if (err.code === "SQLITE_CONSTRAINT") {
+          return db.get(
+            "SELECT id, received_at FROM sms_messages WHERE raw_text = ?",
+            [text],
+            (lookupErr, row) => {
+              if (lookupErr || !row) {
+                console.error("[SMS DUPLICATE LOOKUP ERROR]",
+                  lookupErr ? lookupErr.message : "Row not found");
+                return res.status(500).json({
+                  ok: false,
+                  error: "SMS duplicate lookup failed"
+                });
+              }
+
+              console.log("[SMS DUPLICATE] Existing id:", row.id);
+              return res.json({
+                ok: true,
+                duplicate: true,
+                id: row.id,
+                receivedAt: row.received_at
+              });
+            }
+          );
+        }
+
         console.error("[SMS SAVE ERROR]", err.message);
         return res.status(500).json({
           ok: false,
