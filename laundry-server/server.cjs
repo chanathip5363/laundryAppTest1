@@ -480,3 +480,104 @@ app.get("/fix-null-machine", (req, res) => {
     res.send(`deleted ${this.changes} row`);
   });
 });
+
+
+// ===== รับและบันทึก SMS จาก iPhone =====
+const smsToken = require("fs")
+  .readFileSync(require("path").join(__dirname, ".sms-token"), "utf8")
+  .trim();
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS sms_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    received_at TEXT NOT NULL,
+    raw_text TEXT NOT NULL,
+    bank_date TEXT,
+    bank_time TEXT,
+    receiving_account TEXT,
+    amount_satang INTEGER,
+    parse_status TEXT NOT NULL DEFAULT 'UNPARSED'
+  )
+`, (err) => {
+  if (err) {
+    console.error("[SMS TABLE ERROR]", err.message);
+  } else {
+    console.log("[SMS] Database table ready");
+  }
+});
+
+app.post("/sms-incoming", (req, res) => {
+  if (req.get("X-SMS-Token") !== smsToken) {
+    return res.status(401).json({
+      ok: false,
+      error: "Unauthorized"
+    });
+  }
+
+  const text = req.body?.text;
+
+  if (typeof text !== "string" || !text.trim() || text.length > 2000) {
+    return res.status(400).json({
+      ok: false,
+      error: "Invalid SMS text"
+    });
+  }
+
+  const receivedAt = new Date().toISOString();
+
+
+  const match = text.trim().match(
+    /^(\d{2}\/\d{2}\/\d{2,4})\s+(\d{2}:\d{2})\s+บช\s+(X-\d+)\s+เงินเข้า\s+(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})\s+คงเหลือ/
+  );
+
+  let bankDate = null;
+  let bankTime = null;
+  let receivingAccount = null;
+  let amountSatang = null;
+  let parseStatus = "UNRECOGNIZED";
+
+  if (match) {
+    const amount =
+      Number(match[4].replace(/,/g, "")) * 100 + Number(match[5]);
+
+    if (Number.isSafeInteger(amount) && amount > 0) {
+      bankDate = match[1];
+      bankTime = match[2];
+      receivingAccount = match[3];
+      amountSatang = amount;
+      parseStatus = "PARSED";
+    }
+  }
+
+  db.run(
+    `INSERT INTO sms_messages (
+      received_at, raw_text, bank_date, bank_time,
+      receiving_account, amount_satang, parse_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      receivedAt, text, bankDate, bankTime,
+      receivingAccount, amountSatang, parseStatus
+    ],
+    function (err) {
+      if (err) {
+        console.error("[SMS SAVE ERROR]", err.message);
+        return res.status(500).json({
+          ok: false,
+          error: "SMS save failed"
+        });
+      }
+
+      console.log("[SMS SAVED]", JSON.stringify({
+        id: this.lastID,
+        receivedAt,
+        text
+      }));
+
+      res.json({
+        ok: true,
+        id: this.lastID,
+        receivedAt
+      });
+    }
+  );
+});
