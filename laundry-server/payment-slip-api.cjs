@@ -5,6 +5,7 @@ const path = require("path");
 const { prepareSlipImage, MAX_FILE_BYTES } = require("./slip-image.cjs");
 const { readSlip } = require("./slip-ocr.cjs");
 const { parseSlip } = require("./slip-parser.cjs");
+const { readBblSlip } = require("./slip-bbl.cjs");
 const { verifyPendingPayment } = require("./payment-verify.cjs");
 
 let processing = false;
@@ -114,7 +115,9 @@ function createSlipRouter({
         throw new Error("OCR_FAILED");
       }
 
-      const slip = parseSlip(ocr);
+      const slip = /Bangkok\s+Bank/i.test(ocr.rawText || "")
+        ? await readBblSlip(image, ocr)
+        : { ...parseSlip(ocr), sourceBank: "TTB" };
 
       if (
         slip.extractionStatus !== "EXTRACTED" ||
