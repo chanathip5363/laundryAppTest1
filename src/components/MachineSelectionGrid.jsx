@@ -75,7 +75,7 @@ export default function MachineSelectionGrid({
 
       try {
         const response = await fetch(
-          "http://localhost:3000/machines",
+          "https://api.the-oasis-living.com/machines",
           { cache: "no-store" }
         );
 

@@ -38,6 +38,8 @@ import {
 } from "./constants/laundryConfig";
 
 
+const PAYMENT_API = "https://api.the-oasis-living.com";
+
 function App() {
   const [client, setClient] = useState(null);
   const [status, setStatus] = useState("Disconnected");
@@ -246,39 +248,15 @@ const getPaymentTotal = () => {
 };
 
 
- const checkMachineBeforePay = async () => {
-  try {
-    const res = await fetch("http://localhost:3000/request-qr", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ machine: selectedMachine }),
-    });
+ // Check and reserve on the payment page after React updates its selection.
+const checkMachineBeforePay = async () => true;
 
-    const data = await res.json();
-
-    if (!data.success) {
-      alert(data.message || "เครื่องไม่ว่าง");
-      return false;
-    }
-    setReservedUntil(data.reservedUntil);
-    return true;
-
-  } catch (err) {
-    console.error(err);
-    alert("⚠️ เชื่อมต่อ server ไม่ได้");
-    return false;
-  }
-};
-
-
- const generateQR = () => {
-  const amount = getPaymentTotal() || 0;
+const generateQR = (amount = getPaymentTotal()) => {
+  
 
   const phone = "0909890860"; // 👈 ใส่เบอร์คุณตรงนี้
 
-  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://promptpay.io/${phone}/${amount}`;
+  return `https://promptpay.io/${phone}/${amount}.png`;
 };
 
 const resetOptions = () => {  // เพื่อคืนค่าราคาเป็น 0 บาท ตอนย้อนกลับ
@@ -353,32 +331,9 @@ const [aromaSelected, setAromaSelected] = useState(null);
     // };
   }, []);
 
-  const confirmWash = async () => {
-    try {
-      // ทดสอบกันซ้ำ:
-      // - ถ้าจะทดสอบให้กดซ้ำแล้วโดนกัน ใช้ txid คงที่ เช่น "TX001"
-      // - ถ้าใช้งานจริงค่อยเปลี่ยนเป็น Date.now() หรือ id จาก payment gateway
-      const txid = "TX" + Date.now();
-
-      const machine = selectedMachine;
-      // const priceMap = {
-      //   1: 15,
-      //   2: 15,
-      //   3: 20,
-      //   4: 20,
-      //   5: 25,
-      //   6: 25,
-      //   7: 30,
-      //   8: 30,
-      //   9: 35,
-      //   10: 35,
-      //   11: 40,
-      //   12: 40,
-      //   13: 50,
-      //   14: 50
-      // };
-
-      const paymentProgram =
+  const buildPaymentSelection = () => {
+const machine = selectedMachine;
+const paymentProgram =
         mode === "dry" && selectedMachine === "machine5"
           ? dry1program
           : mode === "dry" && selectedMachine === "machine6"
@@ -406,24 +361,10 @@ const [aromaSelected, setAromaSelected] = useState(null);
       //   return;
       // }
 
-      console.log("Send webhook:", {
-        txid,
-        machine,
-        program: paymentProgram,
-        tempPulse: paymentTempPulse,
-        aromaPulse: paymentAromaPulse,         
-        amount
-      });
-
-      const res = await fetch("http://localhost:3000/webhook", {     
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(
-          mode === "dry"
+      
+return (
+mode === "dry"
             ? {
-                txid,
                 machine,
                 amount,
                 type: "dry",
@@ -448,20 +389,50 @@ const [aromaSelected, setAromaSelected] = useState(null);
 
               }
             : {
-                txid,
                 machine,
                 amount,
+                type: "wash",
                 program: paymentProgram,
                 tempPulse: paymentTempPulse,
                 aromaPulse: paymentAromaPulse,
               }
-        )
-      });
+);
+};
 
-      console.log("webhook status =", res.status, "txid =", txid);
-    } catch (err) {
-      console.log("Webhook error:", err);
+const beginPayment = async () => {
+    const res = await fetch(`${PAYMENT_API}/payments/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildPaymentSelection()),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "สร้างรายการชำระไม่สำเร็จ");
+    setReservedUntil(data.reservedUntil);
+    return data;
+  };
+
+  const confirmWash = async (file, session) => {
+    const form = new FormData();
+    form.append("slip", file);
+    const checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/slip`, {
+      method: "POST", body: form, signal: AbortSignal.timeout(90000)
+    });
+    const payment = await checked.json();
+    if (!checked.ok || !payment.success) {
+      throw new Error(payment.message || "ตรวจชำระไม่ผ่าน กรุณาอย่าโอนซ้ำ");
     }
+    const started = await fetch(`${PAYMENT_API}/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ txid: session.txid }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const result = await started.json();
+    if (!started.ok || !result.success) {
+      throw new Error(result.message || "ตรวจชำระผ่านแล้ว แต่ยังยืนยันการสั่งเครื่องไม่ได้ กรุณาอย่าโอนซ้ำ");
+    }
+    return result;
   };
 
 const finishWash = (machine) => {
@@ -864,6 +835,7 @@ return (
     setStep={setStep}
     setProgramPrice={setProgramPrice}
     resetOptions={resetOptions}
+    beginPayment={beginPayment}
     confirmWash={confirmWash}
     reservedUntil={reservedUntil}
   />

@@ -99,7 +99,7 @@ function isMachineOnline(machine, callback) {
 }
 
 // ===== webhook จาก payment =====
-app.post("/webhook", (req, res) => {
+app.post("/webhook", require("./payment-bridge.cjs").authorizeWebhook(db, client), (req, res) => {
   const {
   txid,
   machine,
@@ -624,7 +624,7 @@ app.post("/sms-incoming", (req, res) => {
 // ===== API สร้างรายการชำระและจองเครื่อง =====
 app.use(
   "/payments",
-  require("./payment-api.cjs").createPaymentRouter()
+  require("./payment-bridge.cjs").createSessionRouter()
 );
 
 

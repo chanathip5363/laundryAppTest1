@@ -7,7 +7,8 @@ const defaultDbPath = path.join(__dirname, "database.db");
 
 async function createCheckout(input, {
   dbPath = defaultDbPath,
-  isTest = false
+  isTest = false,
+  createOrder = createPendingOrder
 } = {}) {
   if (typeof isTest !== "boolean") {
     throw new Error("INVALID_TEST_MODE");
@@ -75,7 +76,7 @@ async function createCheckout(input, {
       [input.machine, isTest ? 1 : 0, now]
     );
 
-    const order = await createPendingOrder(db, input, { isTest });
+    const order = await createOrder(db, input, { isTest });
 
     const reserved = await run(
       `UPDATE machines
