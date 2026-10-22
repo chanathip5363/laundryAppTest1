@@ -75,7 +75,7 @@ export default function MachineSelectionGrid({
 
       try {
         const response = await fetch(
-          "https://82-26-104-220.sslip.io/machines",
+          "https://api.the-oasis-living.com/machines",
           { cache: "no-store" }
         );
 

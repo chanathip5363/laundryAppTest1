@@ -248,7 +248,7 @@ const getPaymentTotal = () => {
 
  const checkMachineBeforePay = async () => {
   try {
-    const res = await fetch("https://82-26-104-220.sslip.io/request-qr", {
+    const res = await fetch("https://api.the-oasis-living.com/request-qr", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -415,7 +415,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
         amount
       });
 
-      const res = await fetch("https://82-26-104-220.sslip.io/webhook", {     
+      const res = await fetch("https://api.the-oasis-living.com/webhook", {     
         method: "POST",
         headers: {
           "Content-Type": "application/json"
