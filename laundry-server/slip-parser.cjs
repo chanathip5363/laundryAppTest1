@@ -11,6 +11,7 @@ function parseSlip(ocr) {
     amountSatang: null,
     receivingAccountSuffix: null,
     receivingBank: null,
+    receivingWalletId: null,
     reference: null
   };
 
@@ -96,7 +97,21 @@ function parseSlip(ocr) {
     /X{3}-X-X{2}(\d{3})-(\d)/gi
   )];
 
+  const walletIds = lines
+    .map(line => line.replace(/[\s-]/g, ""))
+    .filter(line => /^\d{15}$/.test(line));
+
   if (
+    /\bttb\b/i.test(raw) &&
+    /e\s*[-–]?\s*wallet/i.test(raw) &&
+    walletIds.length === 1 &&
+    walletIds[0] === "004999254312902"
+  ) {
+    // รหัส QR และบัญชีรับ SMS ที่เจ้าของยืนยันแล้ว
+    result.receivingWalletId = walletIds[0];
+    result.receivingAccountSuffix = "4891";
+    result.receivingBank = "KBANK";
+  } else if (
     /\bttb\b/i.test(raw) &&
     accounts.length === 2 &&
     /^\s*KBANK\b/i.test(
@@ -110,7 +125,7 @@ function parseSlip(ocr) {
   }
 
   const references = [...raw.matchAll(
-    /รหัสอ้างอิง\s*:\s*(\d{10,40})\s*$/gm
+    /(?:ร|ธ)หัสอ้างอิง\s*:\s*(\d{10,40})(?!\d)/gm
   )];
 
   if (references.length === 1) {

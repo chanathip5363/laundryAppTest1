@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getPaymentQrUrl } from "./utils/paymentQr";
 import mqttClient from "./mqtt/mqttClient";
 import { getTempPulse } from "./utils/getTempPulse";
 import { getAromaPulse } from "./utils/getAromaPulse";
@@ -251,13 +252,7 @@ const getPaymentTotal = () => {
  // Check and reserve on the payment page after React updates its selection.
 const checkMachineBeforePay = async () => true;
 
-const generateQR = (amount = getPaymentTotal()) => {
-  
-
-  const phone = "0909890860"; // 👈 ใส่เบอร์คุณตรงนี้
-
-  return `https://promptpay.io/${phone}/${amount}.png`;
-};
+const generateQR = (amount = getPaymentTotal()) => getPaymentQrUrl(amount);
 
 const resetOptions = () => {  // เพื่อคืนค่าราคาเป็น 0 บาท ตอนย้อนกลับ
   setTempOption(null); 
