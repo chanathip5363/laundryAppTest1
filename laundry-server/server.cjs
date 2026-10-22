@@ -626,3 +626,10 @@ app.use(
   "/payments",
   require("./payment-api.cjs").createPaymentRouter()
 );
+
+
+// ===== API รับสลิปและตรวจคู่กับ SMS =====
+app.use(
+  "/payments",
+  require("./payment-slip-api.cjs").createSlipRouter()
+);
