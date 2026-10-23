@@ -71,6 +71,7 @@ function createSessionRouter({ dbPath = path.join(__dirname, 'database.db'), isT
       res.status(status).json({ success: false, code: known ? err.message : 'SESSION_FAILED', message });
     }
   });
+  router.use(require('./payment-time-api.cjs').createTimeRouter({ dbPath, isTest }));
   return router;
 }
 
@@ -78,8 +79,7 @@ function authorizeWebhook(db, client, { isTest = false } = {}) {
   return async (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     const txid = req.body?.txid;
-    const get = (sql, params = []) => new Promise((resolve, reject) => {
-      db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+    const get = (sql, params = []) => new Promise((resolve, reject) => {      db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
     });
     const deny = (status, code, message) => res.status(status).json({ success: false, code, message });
     try {
@@ -90,7 +90,7 @@ function authorizeWebhook(db, client, { isTest = false } = {}) {
       if (!order || order.is_test !== (isTest ? 1 : 0)) return deny(404, 'ORDER_NOT_FOUND', 'ไม่พบรายการชำระ');
       const receipt = await get('SELECT * FROM payment_receipts WHERE txid=?', [txid]);
       if (!receipt || order.status !== 'PAID' || receipt.amount_satang !== order.amount_satang) {
-        return deny(403, 'PAYMENT_NOT_VERIFIED', 'ยังไม่ผ่านการตรวจสลิปและ SMS');
+        return deny(403, 'PAYMENT_NOT_VERIFIED', 'ยังไม่ผ่านการยืนยันชำระเงิน');
       }
       const existing = await get('SELECT * FROM transactions WHERE txid=?', [txid]);
       if (existing) {

@@ -24,7 +24,7 @@ async function readSlip(imagePath) {
     );
 
     const candidates = lines.filter(
-      line => /[0-9๐-๙]{1,2}:[0-9๐-๙]{2}/.test(line.text)
+      line => /^\s*[0-9๐-๙]{1,2}\s+\S+\s+[0-9๐-๙]{2}(?:[0-9๐-๙]{2})?(?:,\s*|\s+)[0-9๐-๙]{1,2}[.:][0-9๐-๙]{2}(?:\s*น\.?)?\s*$/.test(line.text)
     );
 
     const result = {

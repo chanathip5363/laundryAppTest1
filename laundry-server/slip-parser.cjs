@@ -22,7 +22,7 @@ function parseSlip(ocr) {
 
   function parseDateLine(value) {
     const date = ascii(value).trim().match(
-      /^(\d{1,2})\s+(\S+)\s+(\d{2}|\d{4}),?\s+(\d{2}):(\d{2})\s*น\.?$/
+      /^(\d{1,2})\s+(\S+)\s+(\d{2}|\d{4})(?:,\s*|\s+)(\d{2})[.:](\d{2})\s*น\.?$/
     );
     if (!date) return null;
 

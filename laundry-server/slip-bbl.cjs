@@ -18,11 +18,11 @@ function parseBblSlip(ocr, amountText) {
   const dates = new Map();
   const fallbackDateLines = ocr.dateLineFirst == null && ocr.dateLine == null
     ? raw.split(/\r?\n/).map(s => s.trim()).filter(s =>
-        /^\d{1,2}\s+\S+\s+\d{2}(?:\d{2})?,?\s+(?:[01]\d|2[0-3])[.:][0-5]\d(?:\s*น\.?)?$/.test(s))
+        /^\d{1,2}\s+\S+\s+\d{2}(?:\d{2})?(?:,\s*|\s+)(?:[01]\d|2[0-3])[.:][0-5]\d(?:\s*น\.?)?$/.test(s))
     : [];
   for (const line of [ocr.dateLineFirst, ocr.dateLine, ...fallbackDateLines]) {
     const m = String(line || '').trim().match(
-      /^(\d{1,2})\s+(\S+)\s+(\d{2}|\d{4}),?\s+([01]\d|2[0-3])[.:]([0-5]\d)(?:\s*น\.?)?$/
+      /^(\d{1,2})\s+(\S+)\s+(\d{2}|\d{4})(?:,\s*|\s+)([01]\d|2[0-3])[.:]([0-5]\d)(?:\s*น\.?)?$/
     );
     if (!m) continue;
     const month = months.indexOf(m[2]);
