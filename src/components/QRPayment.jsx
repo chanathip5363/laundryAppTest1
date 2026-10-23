@@ -8,6 +8,9 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
   const [session, setSession] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [file, setFile] = useState(null);
+  const [method, setMethod] = useState('slip');
+  const [hour, setHour] = useState('');
+  const [minute, setMinute] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
@@ -76,13 +79,18 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
     ? Math.max(0, Math.ceil((session.reservedUntil - now) / 1000)) : 0;
   const expired = session && now >= session.reservedUntil;
 
+  const validTime = /^\d{1,2}$/.test(hour) && /^\d{1,2}$/.test(minute) &&
+    Number(hour) < 24 && Number(minute) < 60;
+  const transferTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  const ready = method === 'slip' ? Boolean(file) : validTime;
+
   async function pay() {
-    if (submitting.current || !file || !session || expired) return;
+    if (submitting.current || !ready || !session || Date.now() >= session.reservedUntil) return;
     submitting.current = true;
     setBusy(true);
     setError('');
     try {
-      await confirmWash(file, session);
+      await confirmWash(method === 'slip' ? file : transferTime, session, method);
       setSent(true);
     } catch (err) {
       setError(err.message);
@@ -138,7 +146,20 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
     </div>
     <h2>{session.amount.toFixed(2)} บาท</h2>
     <h3>เหลือเวลา {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</h3>
-    <p>ตรวจสอบชื่อผู้รับและยอดในแอปธนาคารก่อนยืนยันโอน แล้วแนบสลิป</p>
+    <fieldset disabled={busy} style={{ margin: '16px 0' }}>
+      <legend>เลือกวิธียืนยันการชำระ</legend>
+      <button type="button" aria-pressed={method === 'slip'}
+        onClick={() => { setMethod('slip'); setError(''); }}>
+        {method === 'slip' ? '✓ ' : ''}แนบสลิป
+      </button>{' '}
+      <button type="button" aria-pressed={method === 'time'}
+        onClick={() => { setMethod('time'); setError(''); }}>
+        {method === 'time' ? '✓ ' : ''}กรอกเวลาโอน
+      </button>
+    </fieldset>
+    <p>ตรวจสอบชื่อผู้รับและยอดในแอปธนาคารก่อนยืนยันโอน</p>
+    {method === 'slip' ? <>
+    <p>แนบสลิปเพื่อยืนยันการชำระ</p>
     <input type="file" accept="image/jpeg,image/png" disabled={busy}
       onChange={event => {
         const chosen = event.target.files?.[0] || null;
@@ -150,9 +171,32 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
         setFile(chosen);
         setError('');
       }} />
+    </> : <>
+      <p>ดูเวลาทำธุรกรรมบนสลิป แล้วกรอกแบบ 24 ชั่วโมง เช่น 14:15</p>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+        <label>ชั่วโมง<br />
+          <input type="text" inputMode="numeric" maxLength={2} placeholder="14"
+            value={hour} disabled={busy} autoComplete="off"
+            style={{ width: '4em', fontSize: '1.2em' }}
+            onChange={event => {
+              setHour(event.target.value.replace(/[^0-9]/g, '')); setError('');
+            }} />
+        </label>
+        <span>:</span>
+        <label>นาที<br />
+          <input type="text" inputMode="numeric" maxLength={2} placeholder="15"
+            value={minute} disabled={busy} autoComplete="off"
+            style={{ width: '4em', fontSize: '1.2em' }}
+            onChange={event => {
+              setMinute(event.target.value.replace(/[^0-9]/g, '')); setError('');
+            }} />
+        </label>
+      </div>
+      <p>ไม่ต้องแนบสลิป ระบบตรวจเวลาและยอดกับ SMS เงินเข้า</p>
+    </>}
     <br />
-    <button onClick={pay} disabled={!file || busy || expired}>
-      {busy ? 'กำลังตรวจสลิปและส่งคำสั่ง…' : 'ตรวจชำระและเริ่มเครื่อง'}
+    <button onClick={pay} disabled={!ready || busy || expired}>
+      {busy ? 'กำลังตรวจชำระและส่งคำสั่ง…' : 'ตรวจชำระและเริ่มเครื่อง'}
     </button>
     {error && <p role="alert">{error}</p>}
     <p>รหัสรายการ: {session.txid}</p>

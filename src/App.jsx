@@ -407,12 +407,22 @@ const beginPayment = async () => {
     return data;
   };
 
-  const confirmWash = async (file, session) => {
-    const form = new FormData();
-    form.append("slip", file);
-    const checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/slip`, {
-      method: "POST", body: form, signal: AbortSignal.timeout(90000)
-    });
+  const confirmWash = async (evidence, session, method = "slip") => {
+    let checked;
+    if (method === "time") {
+      checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/time`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transferTime: evidence }),
+        signal: AbortSignal.timeout(15000)
+      });
+    } else {
+      const form = new FormData();
+      form.append("slip", evidence);
+      checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/slip`, {
+        method: "POST", body: form, signal: AbortSignal.timeout(90000)
+      });
+    }
     const payment = await checked.json();
     if (!checked.ok || !payment.success) {
       throw new Error(payment.message || "ตรวจชำระไม่ผ่าน กรุณาอย่าโอนซ้ำ");
