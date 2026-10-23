@@ -37,6 +37,7 @@ async function verifyPaymentTime(txid, transferTime, {
     transaction = true;
     const order = await get('SELECT * FROM payment_orders WHERE txid = ?', [txid]);
     if (!order || order.is_test !== (isTest ? 1 : 0)) throw new Error('ORDER_NOT_FOUND');
+    await require('./payment-omise.cjs').assertSmsMethod(db, txid);
     const existing = await get('SELECT * FROM payment_receipts WHERE txid = ?', [txid]);
     if (existing) {
       const sms = await get('SELECT bank_time FROM sms_messages WHERE id = ?', [existing.sms_id]);

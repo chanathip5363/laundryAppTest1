@@ -144,6 +144,7 @@ function createSlipRouter({
       });
     } catch (err) {
       const errors = {
+        PAYMENT_METHOD_LOCKED: [409, 'รายการนี้เลือก Omise แล้ว กรุณาใช้ Omise ต่อ'],
         ORDER_NOT_FOUND: [404, "ไม่พบรายการชำระ"],
         ORDER_NOT_PENDING: [409, "รายการนี้ไม่ได้อยู่ระหว่างรอชำระ"],
         ORDER_EXPIRED: [409, "รายการชำระหมดเวลาแล้ว"],

@@ -409,7 +409,11 @@ const beginPayment = async () => {
 
   const confirmWash = async (evidence, session, method = "slip") => {
     let checked;
-    if (method === "time") {
+    if (method === "omise") {
+      checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/omise`, {
+        signal: AbortSignal.timeout(20000)
+      });
+    } else if (method === "time") {
       checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/time`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -427,6 +431,9 @@ const beginPayment = async () => {
     if (!checked.ok || !payment.success) {
       throw new Error(payment.message || "ตรวจชำระไม่ผ่าน กรุณาอย่าโอนซ้ำ");
     }
+    if (method === "omise" && payment.status !== "PAID") {
+      throw new Error("Omise ยังไม่ยืนยันชำระสำเร็จ");
+    }
     const started = await fetch(`${PAYMENT_API}/webhook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -438,6 +445,25 @@ const beginPayment = async () => {
       throw new Error(result.message || "ตรวจชำระผ่านแล้ว แต่ยังยืนยันการสั่งเครื่องไม่ได้ กรุณาอย่าโอนซ้ำ");
     }
     return result;
+  };
+
+  const createOmisePayment = async session => {
+    const res = await fetch(`${PAYMENT_API}/payments/${session.txid}/omise`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: "{}", signal: AbortSignal.timeout(20000)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "สร้าง Omise ไม่สำเร็จ");
+    return data;
+  };
+
+  const checkOmisePayment = async session => {
+    const res = await fetch(`${PAYMENT_API}/payments/${session.txid}/omise`, {
+      cache: "no-store", signal: AbortSignal.timeout(20000)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "ตรวจ Omise ไม่สำเร็จ");
+    return data;
   };
 
 const finishWash = (machine) => {
@@ -842,6 +868,8 @@ return (
     resetOptions={resetOptions}
     beginPayment={beginPayment}
     confirmWash={confirmWash}
+    createOmisePayment={createOmisePayment}
+    checkOmisePayment={checkOmisePayment}
     reservedUntil={reservedUntil}
   />
 )}

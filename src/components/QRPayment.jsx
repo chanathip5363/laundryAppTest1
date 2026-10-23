@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { prepareQrImage, saveQrImage } from '../utils/saveQrImage';
 
-function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
+function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, checkOmisePayment, setProgram,
   setStep, setProgramPrice, resetOptions }) {
   const initialRequest = useRef(null);
   const submitting = useRef(false);
@@ -9,6 +9,10 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
   const [now, setNow] = useState(Date.now());
   const [file, setFile] = useState(null);
   const [method, setMethod] = useState('slip');
+  const [omise, setOmise] = useState(null);
+  const [omiseLocked, setOmiseLocked] = useState(false);
+  const [omiseCreating, setOmiseCreating] = useState(false);
+  const omiseCreateLock = useRef(false);
   const [hour, setHour] = useState('');
   const [minute, setMinute] = useState('');
   const [busy, setBusy] = useState(false);
@@ -18,13 +22,13 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
   const [qrSaving, setQrSaving] = useState(false);
   const [qrSaveError, setQrSaveError] = useState('');
   const qrSaveLock = useRef(false);
-  const qrUrl = session ? generateQR(session.amount) : '';
+  const qrUrl = method === 'omise' ? (omise?.qrUrl || '') : session ? generateQR(session.amount) : '';
   const qrFilename = session ? `laundry-qr-${session.txid}.png` : '';
 
   useEffect(() => {
     setQrImage(null);
     setQrSaveError('');
-    if (!qrUrl) return;
+    if (!qrUrl || method === 'omise') return;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     let active = true;
@@ -39,7 +43,7 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [qrUrl, qrFilename]);
+  }, [qrUrl, qrFilename, method]);
 
   async function saveQR() {
     if (qrSaveLock.current || !qrImage || !session ||
@@ -74,6 +78,59 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
     const timer = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(timer);
   }, []);
+
+  async function beginOmise() {
+    if (omiseCreateLock.current || !session || Date.now() >= session.reservedUntil) return;
+    omiseCreateLock.current = true;
+    setOmiseLocked(true);
+    setOmiseCreating(true);
+    setError('');
+    try {
+      setOmise(await createOmisePayment(session));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      omiseCreateLock.current = false;
+      setOmiseCreating(false);
+    }
+  }
+
+  useEffect(() => {
+    if (method !== 'omise' || !omise || !session || sent) return;
+    let active = true;
+    let timer;
+    async function poll() {
+      if (!active || Date.now() >= session.reservedUntil) return;
+      let stop = false;
+      try {
+        const result = await checkOmisePayment(session);
+        if (!active) return;
+        if (result.status === 'PAID') {
+          stop = true;
+          if (!submitting.current) {
+            submitting.current = true;
+            setBusy(true);
+            try {
+              await confirmWash(null, session, 'omise');
+              if (active) { setError(''); setSent(true); }
+            } finally {
+              submitting.current = false;
+              if (active) setBusy(false);
+            }
+          }
+        } else if (result.status === 'failed' || result.status === 'expired') {
+          stop = true;
+          setError('รายการ Omise ไม่สำเร็จหรือหมดอายุ กรุณาทำรายการใหม่');
+        }
+      } catch (err) {
+        if (active) setError(err.message);
+      } finally {
+        if (active && !stop) timer = setTimeout(poll, 3000);
+      }
+    }
+    poll();
+    return () => { active = false; clearTimeout(timer); };
+  }, [method, omise, session, sent, checkOmisePayment, confirmWash]);
 
   const remaining = session
     ? Math.max(0, Math.ceil((session.reservedUntil - now) / 1000)) : 0;
@@ -130,8 +187,9 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
 
   return <>
     <h2>ชำระเงิน</h2>
-    <img src={qrUrl} alt="QR พร้อมเพย์ชำระค่าบริการ"
-      style={{ width: '250px' }} />
+    {qrUrl && <img src={qrUrl} alt="QR พร้อมเพย์ชำระค่าบริการ"
+      style={{ width: '250px' }} />}
+    {method !== 'omise' && <>
     <div style={{ margin: '12px 0' }}>
       <button type="button" onClick={saveQR}
         disabled={!qrImage || qrSaving || busy || expired}>
@@ -144,9 +202,10 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
         <a href={qrUrl} target="_blank" rel="noopener noreferrer">เปิดภาพ QR เพื่อบันทึก</a>
       </>}
     </div>
+    </>}
     <h2>{session.amount.toFixed(2)} บาท</h2>
     <h3>เหลือเวลา {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</h3>
-    <fieldset disabled={busy} style={{ margin: '16px 0' }}>
+    <fieldset disabled={busy || omiseLocked} style={{ margin: '16px 0' }}>
       <legend>เลือกวิธียืนยันการชำระ</legend>
       <button type="button" aria-pressed={method === 'slip'}
         onClick={() => { setMethod('slip'); setError(''); }}>
@@ -156,7 +215,31 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
         onClick={() => { setMethod('time'); setError(''); }}>
         {method === 'time' ? '✓ ' : ''}กรอกเวลาโอน
       </button>
+      {' '}<button type="button" aria-pressed={method === 'omise'}
+        onClick={() => { setMethod('omise'); setError(''); }}>
+        {method === 'omise' ? '✓ ' : ''}Omise (ทดสอบ)
+      </button>
     </fieldset>
+    {method === 'omise' ? <section>
+      <h3>Omise Test Mode — ไม่ต้องโอนเงินจริง</h3>
+      <p>สร้างรายการ แล้วให้ผู้สาธิตกด Successful ใน Omise Dashboard ระบบจะตรวจผลและส่งคำสั่งเริ่มเครื่องจริง</p>
+      <p>เมื่อสร้างรายการ Omise แล้ว จะเปลี่ยนวิธียืนยันในรายการนี้ไม่ได้</p>
+      {!omise ? <button type="button" onClick={beginOmise}
+        disabled={omiseCreating || expired}>
+        {omiseCreating ? 'กำลังสร้าง Omise…' : 'สร้าง QR ทดสอบ Omise'}
+      </button> : <>
+        <p>รหัส Omise: {omise.chargeId}</p>
+        <p role="status">กำลังรอผลชำระจาก Omise…</p>
+        <button type="button" disabled={busy || expired}
+          onClick={async () => {
+            if (submitting.current) return;
+            submitting.current = true; setBusy(true); setError('');
+            try { await confirmWash(null, session, 'omise'); setSent(true); }
+            catch (err) { setError(err.message); }
+            finally { submitting.current = false; setBusy(false); }
+          }}>ตรวจสถานะและเริ่มเครื่อง</button>
+      </>}
+    </section> : <>
     <p>ตรวจสอบชื่อผู้รับและยอดในแอปธนาคารก่อนยืนยันโอน</p>
     {method === 'slip' ? <>
     <p>แนบสลิปเพื่อยืนยันการชำระ</p>
@@ -198,6 +281,7 @@ function QRPayment({ generateQR, beginPayment, confirmWash, setProgram,
     <button onClick={pay} disabled={!ready || busy || expired}>
       {busy ? 'กำลังตรวจชำระและส่งคำสั่ง…' : 'ตรวจชำระและเริ่มเครื่อง'}
     </button>
+    </>}
     {error && <p role="alert">{error}</p>}
     <p>รหัสรายการ: {session.txid}</p>
     <p>หากตรวจไม่ผ่าน อย่าโอนซ้ำ ให้ตรวจข้อความแจ้งผลหรือติดต่อผู้ดูแล</p>
