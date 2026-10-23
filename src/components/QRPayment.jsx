@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { prepareQrImage, saveQrImage } from '../utils/saveQrImage';
 
-function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, checkOmisePayment, setProgram,
+function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, checkOmisePayment, createDiscountPayment, checkDiscountPayment, setProgram,
   setStep, setProgramPrice, resetOptions }) {
   const initialRequest = useRef(null);
   const submitting = useRef(false);
@@ -9,6 +9,10 @@ function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, 
   const [now, setNow] = useState(Date.now());
   const [file, setFile] = useState(null);
   const [method, setMethod] = useState('slip');
+  const [discount, setDiscount] = useState(null);
+  const [discountLocked, setDiscountLocked] = useState(false);
+  const [drawing, setDrawing] = useState(false);
+  const drawLock = useRef(false);
   const [omise, setOmise] = useState(null);
   const [omiseLocked, setOmiseLocked] = useState(false);
   const [omiseCreating, setOmiseCreating] = useState(false);
@@ -22,7 +26,8 @@ function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, 
   const [qrSaving, setQrSaving] = useState(false);
   const [qrSaveError, setQrSaveError] = useState('');
   const qrSaveLock = useRef(false);
-  const qrUrl = method === 'omise' ? (omise?.qrUrl || '') : session ? generateQR(session.amount) : '';
+  const qrUrl = method === 'omise' ? (omise?.qrUrl || '')
+    : method === 'discount' && !discount ? '' : session ? generateQR(session.amount) : '';
   const qrFilename = session ? `laundry-qr-${session.txid}.png` : '';
 
   useEffect(() => {
@@ -132,6 +137,61 @@ function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, 
     return () => { active = false; clearTimeout(timer); };
   }, [method, omise, session, sent, checkOmisePayment, confirmWash]);
 
+  async function drawDiscount() {
+    if (drawLock.current || !session || Date.now() >= session.reservedUntil) return;
+    drawLock.current = true;
+    setDrawing(true);
+    setDiscountLocked(true);
+    setError('');
+    try {
+      const data = await createDiscountPayment(session);
+      setSession(current => ({ ...current, amount: data.amount, amountSatang: data.amountSatang }));
+      setDiscount(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      drawLock.current = false;
+      setDrawing(false);
+    }
+  }
+
+  useEffect(() => {
+    if (method !== 'discount' || !discount || !session || sent) return;
+    let active = true;
+    let timer;
+    async function poll() {
+      if (!active || Date.now() >= session.reservedUntil) return;
+      let stop = false;
+      try {
+        const result = await checkDiscountPayment(session);
+        if (!active) return;
+        if (result.status === 'PAID') {
+          stop = true;
+          if (!submitting.current) {
+            submitting.current = true;
+            setBusy(true);
+            try {
+              await confirmWash(null, session, 'discount');
+              if (active) { setError(''); setSent(true); }
+            } finally {
+              submitting.current = false;
+              if (active) setBusy(false);
+            }
+          }
+        } else if (result.status === 'failed' || result.status === 'expired') {
+          stop = true;
+          setError('รายการส่วนลดหมดอายุ กรุณาทำรายการใหม่');
+        }
+      } catch (err) {
+        if (active) setError(err.message);
+      } finally {
+        if (active && !stop) timer = setTimeout(poll, 3000);
+      }
+    }
+    poll();
+    return () => { active = false; clearTimeout(timer); };
+  }, [method, discount, session, sent, checkDiscountPayment, confirmWash]);
+
   const remaining = session
     ? Math.max(0, Math.ceil((session.reservedUntil - now) / 1000)) : 0;
   const expired = session && now >= session.reservedUntil;
@@ -189,7 +249,7 @@ function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, 
     <h2>ชำระเงิน</h2>
     {qrUrl && <img src={qrUrl} alt="QR พร้อมเพย์ชำระค่าบริการ"
       style={{ width: '250px' }} />}
-    {method !== 'omise' && <>
+    {method !== 'omise' && (method !== 'discount' || discount) && <>
     <div style={{ margin: '12px 0' }}>
       <button type="button" onClick={saveQR}
         disabled={!qrImage || qrSaving || busy || expired}>
@@ -205,7 +265,7 @@ function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, 
     </>}
     <h2>{session.amount.toFixed(2)} บาท</h2>
     <h3>เหลือเวลา {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</h3>
-    <fieldset disabled={busy || omiseLocked} style={{ margin: '16px 0' }}>
+    <fieldset disabled={busy || omiseLocked || discountLocked} style={{ margin: '16px 0' }}>
       <legend>เลือกวิธียืนยันการชำระ</legend>
       <button type="button" aria-pressed={method === 'slip'}
         onClick={() => { setMethod('slip'); setError(''); }}>
@@ -219,10 +279,35 @@ function QRPayment({ generateQR, beginPayment, confirmWash, createOmisePayment, 
         onClick={() => { setMethod('omise'); setError(''); }}>
         {method === 'omise' ? '✓ ' : ''}Omise (ทดสอบ)
       </button>
+      {' '}<button type="button" aria-pressed={method === 'discount'}
+        onClick={() => { setMethod('discount'); setError(''); }}>
+        {method === 'discount' ? '✓ ' : ''}สุ่มส่วนลด + SMS
+      </button>
     </fieldset>
-    {method === 'omise' ? <section>
+    {method === 'discount' ? <section>
+      <h3>ลุ้นส่วนลดก่อนชำระเงิน</h3>
+      {!discount ? <>
+        <p>กดสุ่มส่วนลด 0.01–0.10 บาท แล้วสแกนจ่ายตามยอดใหม่ที่แสดง</p>
+        <button type="button" onClick={drawDiscount} disabled={drawing || expired}>
+          {drawing ? 'กำลังสุ่มส่วนลด…' : 'ลุ้นส่วนลด'}
+        </button>
+      </> : <>
+        <p>ราคาเต็ม {(discount.baseAmountSatang / 100).toFixed(2)} บาท</p>
+        <h3>ได้รับส่วนลด {(discount.discountSatang / 100).toFixed(2)} บาท</h3>
+        <p>ชำระให้ตรงยอด {session.amount.toFixed(2)} บาท ภายในเวลาที่เหลือ</p>
+        <p role="status">ระบบกำลังรอ SMS เงินเข้า ไม่ต้องแนบสลิปหรือกรอกเวลา</p>
+        <button type="button" disabled={busy || expired}
+          onClick={async () => {
+            if (submitting.current) return;
+            submitting.current = true; setBusy(true); setError('');
+            try { await confirmWash(null, session, 'discount'); setSent(true); }
+            catch (err) { setError(err.message); }
+            finally { submitting.current = false; setBusy(false); }
+          }}>ตรวจเงินเข้าและเริ่มเครื่อง</button>
+      </>}
+    </section> : method === 'omise' ? <section>
       <h3>Omise Test Mode — ไม่ต้องโอนเงินจริง</h3>
-      <p>สร้างรายการ แล้วให้ผู้สาธิตกด Successful ใน Omise Dashboard ระบบจะตรวจผลและส่งคำสั่งเริ่มเครื่องจริง</p>
+      <p>สร้างรายการ แล้วให้ผู้สาธิตกด Testing → Mark as paid ใน Omise Dashboard ระบบจะตรวจผลและส่งคำสั่งเริ่มเครื่องจริง</p>
       <p>เมื่อสร้างรายการ Omise แล้ว จะเปลี่ยนวิธียืนยันในรายการนี้ไม่ได้</p>
       {!omise ? <button type="button" onClick={beginOmise}
         disabled={omiseCreating || expired}>

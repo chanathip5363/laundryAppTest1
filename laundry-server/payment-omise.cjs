@@ -111,6 +111,7 @@ function createOmiseService({ dbPath = defaultDbPath, isTest = false, provider =
     try {
       await q.run('BEGIN IMMEDIATE'); transaction = true;
       const order = await readOrder(q, txid);
+      await require('./payment-discount.cjs').assertNoDiscountMethod(db, txid);
       if (order.amount_satang < 2000) throw new Error('OMISE_MINIMUM_AMOUNT');
       const receipt = await q.get('SELECT txid FROM payment_receipts WHERE txid=?', [txid]);
       if (receipt) throw new Error('ORDER_ALREADY_HAS_EVIDENCE');

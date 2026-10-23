@@ -31,6 +31,7 @@ function selection(input) {
 async function saveSelectedOrder(db, input, { isTest = false } = {}) {
   const { command, amountSatang } = selection(input);
   await initializeReceipts(db);
+  await require('./payment-discount.cjs').assertBaseAmountAvailable(db, amountSatang, isTest);
   const txid = 'TX' + randomUUID().replace(/-/g, '');
   const createdAt = Date.now();
   const expiresAt = createdAt + 120000;
@@ -60,6 +61,7 @@ function createSessionRouter({ dbPath = path.join(__dirname, 'database.db'), isT
     } catch (err) {
       const errors = {
         INVALID_SELECTION: [400, 'ข้อมูลรายการชำระไม่ถูกต้อง'],
+        PAYMENT_AMOUNT_RESERVED: [409, 'ยอดนี้อยู่ระหว่างจองส่วนลด กรุณารอสักครู่แล้วลองใหม่'],
         MACHINE_NOT_FOUND: [404, 'ไม่พบเครื่อง'],
         MACHINE_OFFLINE: [409, 'เครื่องออฟไลน์'],
         MACHINE_BUSY: [409, 'เครื่องไม่ว่าง'],
@@ -73,6 +75,7 @@ function createSessionRouter({ dbPath = path.join(__dirname, 'database.db'), isT
   });
   router.use(require('./payment-time-api.cjs').createTimeRouter({ dbPath, isTest }));
   router.use(require('./payment-omise-api.cjs').createOmiseRouter({ dbPath, isTest }));
+  router.use(require('./payment-discount-api.cjs').createDiscountRouter({ dbPath, isTest }));
   return router;
 }
 
