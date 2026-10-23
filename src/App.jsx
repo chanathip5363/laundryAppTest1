@@ -409,7 +409,11 @@ const beginPayment = async () => {
 
   const confirmWash = async (evidence, session, method = "slip") => {
     let checked;
-    if (method === "omise") {
+    if (method === "discount") {
+      checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/discount`, {
+        cache: "no-store", signal: AbortSignal.timeout(15000)
+      });
+    } else if (method === "omise") {
       checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/omise`, {
         signal: AbortSignal.timeout(20000)
       });
@@ -431,8 +435,8 @@ const beginPayment = async () => {
     if (!checked.ok || !payment.success) {
       throw new Error(payment.message || "ตรวจชำระไม่ผ่าน กรุณาอย่าโอนซ้ำ");
     }
-    if (method === "omise" && payment.status !== "PAID") {
-      throw new Error("Omise ยังไม่ยืนยันชำระสำเร็จ");
+    if (["omise", "discount"].includes(method) && payment.status !== "PAID") {
+      throw new Error("ยังไม่พบผลยืนยันชำระสำเร็จ กรุณาอย่าโอนซ้ำ");
     }
     const started = await fetch(`${PAYMENT_API}/webhook`, {
       method: "POST",
@@ -463,6 +467,25 @@ const beginPayment = async () => {
     });
     const data = await res.json();
     if (!res.ok || !data.success) throw new Error(data.message || "ตรวจ Omise ไม่สำเร็จ");
+    return data;
+  };
+
+  const createDiscountPayment = async session => {
+    const res = await fetch(`${PAYMENT_API}/payments/${session.txid}/discount`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: "{}", signal: AbortSignal.timeout(15000)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "สุ่มส่วนลดไม่สำเร็จ");
+    return data;
+  };
+
+  const checkDiscountPayment = async session => {
+    const res = await fetch(`${PAYMENT_API}/payments/${session.txid}/discount`, {
+      cache: "no-store", signal: AbortSignal.timeout(15000)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "ตรวจ SMS ไม่สำเร็จ");
     return data;
   };
 
@@ -870,6 +893,8 @@ return (
     confirmWash={confirmWash}
     createOmisePayment={createOmisePayment}
     checkOmisePayment={checkOmisePayment}
+    createDiscountPayment={createDiscountPayment}
+    checkDiscountPayment={checkDiscountPayment}
     reservedUntil={reservedUntil}
   />
 )}

@@ -5,6 +5,7 @@ function createOmiseRouter(options = {}) {
   const service = createOmiseService(options);
   const fail = (res, err) => {
     const errors = {
+      PAYMENT_METHOD_LOCKED:[409,'รายการนี้เลือกสุ่มส่วนลดแล้ว กรุณาใช้วิธีเดิมต่อ'],
       INVALID_TXID:[400,'รหัสรายการไม่ถูกต้อง'], INVALID_INPUT:[400,'ข้อมูลไม่ถูกต้อง'],
       ORDER_NOT_FOUND:[404,'ไม่พบรายการชำระ'], ORDER_NOT_PENDING:[409,'รายการนี้ไม่ได้รอชำระ'],
       ORDER_EXPIRED:[409,'รายการหมดเวลาแล้ว กรุณาทำรายการใหม่'],
