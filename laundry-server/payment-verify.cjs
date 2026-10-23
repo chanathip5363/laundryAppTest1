@@ -81,6 +81,7 @@ async function verifyPendingPayment(txid, slip, {
     if (order.is_test !== (isTest ? 1 : 0)) {
       throw new Error("TEST_MODE_MISMATCH");
     }
+    await require('./payment-omise.cjs').assertSmsMethod(db, txid);
     if (order.amount_satang !== slip.amountSatang) {
       throw new Error("AMOUNT_MISMATCH");
     }

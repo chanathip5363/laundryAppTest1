@@ -72,6 +72,7 @@ function createSessionRouter({ dbPath = path.join(__dirname, 'database.db'), isT
     }
   });
   router.use(require('./payment-time-api.cjs').createTimeRouter({ dbPath, isTest }));
+  router.use(require('./payment-omise-api.cjs').createOmiseRouter({ dbPath, isTest }));
   return router;
 }
 
@@ -88,7 +89,8 @@ function authorizeWebhook(db, client, { isTest = false } = {}) {
       }
       const order = await get('SELECT * FROM payment_orders WHERE txid=?', [txid]);
       if (!order || order.is_test !== (isTest ? 1 : 0)) return deny(404, 'ORDER_NOT_FOUND', 'ไม่พบรายการชำระ');
-      const receipt = await get('SELECT * FROM payment_receipts WHERE txid=?', [txid]);
+      const receipt = await get('SELECT * FROM payment_receipts WHERE txid=?', [txid]) ||
+        await require('./payment-omise.cjs').getOmiseReceipt(db, txid);
       if (!receipt || order.status !== 'PAID' || receipt.amount_satang !== order.amount_satang) {
         return deny(403, 'PAYMENT_NOT_VERIFIED', 'ยังไม่ผ่านการยืนยันชำระเงิน');
       }

@@ -17,6 +17,7 @@ function createTimeRouter({ dbPath, isTest = false } = {}) {
         message: 'ยืนยันการชำระเงินแล้ว' });
     } catch (err) {
       const errors = {
+        PAYMENT_METHOD_LOCKED: [409, 'รายการนี้เลือก Omise แล้ว กรุณาใช้ Omise ต่อ'],
         INVALID_INPUT: [400, 'กรุณากรอกเฉพาะเวลาโอนจากสลิป'],
         INVALID_TXID: [400, 'รหัสรายการไม่ถูกต้อง'],
         INVALID_PAYMENT_TIME: [400, 'กรุณากรอกเวลาแบบ 24 ชั่วโมง เช่น 14:15'],
