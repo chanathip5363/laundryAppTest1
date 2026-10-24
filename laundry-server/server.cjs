@@ -25,6 +25,7 @@ client.on("connect", () => {
 
     client.subscribe("laundry/+/state");
     client.subscribe("laundry/+/status");    
+    client.subscribe("laundry/+/telemetry");
 });
 
 // ===== DATABASE =====
@@ -205,6 +206,57 @@ isMachineOnline(machine, (online) => {
             return res.sendStatus(200);
           }
 
+
+          // ===== USAGE START: บันทึกค่ามิเตอร์เมื่อชำระเงินสำเร็จ =====
+          if (machine === "machine1") {
+            db.get(
+              `SELECT energy_kwh, water_liters, received_at
+               FROM machine_telemetry
+               WHERE machine = ?
+               ORDER BY id DESC LIMIT 1`,
+              [machine],
+              (usageErr, meter) => {
+                if (usageErr) {
+                  console.error("[USAGE START] Telemetry DB error:", usageErr);
+                  return;
+                }
+
+                const ageMs = meter
+                  ? Date.now() - Date.parse(meter.received_at)
+                  : Infinity;
+
+                const fresh = Number.isFinite(ageMs) &&
+                              ageMs >= 0 && ageMs <= 30000;
+
+                const energy = fresh && Number.isFinite(meter.energy_kwh)
+                  ? meter.energy_kwh : null;
+
+                const water = fresh && Number.isFinite(meter.water_liters)
+                  ? meter.water_liters : null;
+
+                db.run(
+                  `INSERT OR IGNORE INTO machine_usage
+                   (txid, machine, started_at,
+                    start_energy_kwh, start_water_liters, status)
+                   VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                           ?, ?, ?)`,
+                  [txid, machine, energy, water,
+                   fresh && energy !== null && water !== null
+                     ? "STARTED" : "MISSING_START"],
+                  function (insertErr) {
+                    if (insertErr) {
+                      console.error("[USAGE START] Insert error:", insertErr);
+                    } else {
+                      console.log("[USAGE START]", txid,
+                                  "saved:", this.changes);
+                    }
+                  }
+                );
+              }
+            );
+          }
+          // ===== END USAGE START =====
+
           // 4. อัพเดทเครื่องเป็น STARTING
           db.run(
             "UPDATE machines SET state = 'STARTING', reserved_until = NULL WHERE machine = ?",
@@ -341,7 +393,59 @@ if (row) {
 client.subscribe("laundry/+/state");
 
 client.on("message", (topic, message)=>{
+        // ===== บันทึกข้อมูลไฟฟ้าและน้ำจาก ESP32 =====
+    if (topic === "laundry/machine1/telemetry") {
+      let data;
 
+      try {
+        data = JSON.parse(message.toString());
+      } catch (err) {
+        console.error("[TELEMETRY] Invalid JSON:", err.message);
+        return;
+      }
+
+      const fields = [
+        "voltage",
+        "current",
+        "power",
+        "energy_kwh",
+        "water_liters"
+      ];
+
+      const valid = fields.every(
+        key => data[key] === null ||
+          (typeof data[key] === "number" && Number.isFinite(data[key]) && data[key] >= 0)
+      );
+
+      if (!valid || fields.some(key => data[key] === undefined)) {
+        console.error("[TELEMETRY] Invalid measurements");
+        return;
+      }
+
+      db.run(
+        `INSERT INTO machine_telemetry
+         (machine, voltage, current, power, energy_kwh, water_liters)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          "machine1",
+          data.voltage,
+          data.current,
+          data.power,
+          data.energy_kwh,
+          data.water_liters
+        ],
+        function(err) {
+          if (err) {
+            console.error("[TELEMETRY] DB ERROR:", err.message);
+          } else {
+            console.log("[TELEMETRY] machine1 saved:", this.lastID);
+          }
+        }
+      );
+
+      return;
+    }
+    // ===== จบส่วนบันทึก Telemetry =====
     const msg = message.toString().trim().toUpperCase();
     const machine = topic.split("/")[1];
     const type = topic.split("/")[2];
@@ -349,6 +453,211 @@ client.on("message", (topic, message)=>{
     console.log(`[${type.toUpperCase()}] ${machine} = ${msg}`);
 
 if (type === "state" && msg === "FINISH") {
+
+
+// ===== CALCULATED ENERGY =====
+function calculateUsageEnergy(txid, machine) {
+  db.get(
+    `SELECT started_at, finished_at
+     FROM machine_usage
+     WHERE txid=? AND machine=? AND status='FINISHED'`,
+    [txid, machine],
+    (err, usage) => {
+      if (err || !usage || !usage.finished_at) {
+        if (err) console.error("[ENERGY CALC]", err);
+        return;
+      }
+
+      const startMs = Date.parse(usage.started_at);
+      const endMs = Date.parse(usage.finished_at);
+
+      if (!Number.isFinite(startMs) ||
+          !Number.isFinite(endMs) ||
+          endMs <= startMs) {
+        console.error("[ENERGY CALC] Invalid time:", txid);
+        return;
+      }
+
+      const from = new Date(startMs - 30000).toISOString();
+      const to = new Date(endMs + 30000).toISOString();
+
+      db.all(
+        `SELECT received_at, power
+         FROM machine_telemetry
+         WHERE machine=?
+           AND received_at>=?
+           AND received_at<=?
+         ORDER BY received_at`,
+        [machine, from, to],
+        (readErr, rows) => {
+          if (readErr) {
+            console.error("[ENERGY CALC]", readErr);
+            return;
+          }
+
+          let energyWh = 0;
+          let coveredSeconds = 0;
+
+          for (let i = 1; i < rows.length; i++) {
+            const a = rows[i - 1];
+            const b = rows[i];
+
+            const t1 = Date.parse(a.received_at);
+            const t2 = Date.parse(b.received_at);
+            const dt = (t2 - t1) / 1000;
+
+            if (!Number.isFinite(dt) ||
+                dt <= 0 || dt > 15 ||
+                !Number.isFinite(a.power) ||
+                !Number.isFinite(b.power)) {
+              continue;
+            }
+
+            const left = Math.max(t1, startMs);
+            const right = Math.min(t2, endMs);
+
+            if (right <= left) continue;
+
+            const fractionLeft = (left - t1) / (t2 - t1);
+            const fractionRight = (right - t1) / (t2 - t1);
+
+            const powerLeft =
+              a.power + (b.power - a.power) * fractionLeft;
+
+            const powerRight =
+              a.power + (b.power - a.power) * fractionRight;
+
+            const seconds = (right - left) / 1000;
+
+            energyWh +=
+              ((powerLeft + powerRight) / 2) * seconds / 3600;
+
+            coveredSeconds += seconds;
+          }
+
+          const totalSeconds = (endMs - startMs) / 1000;
+          const coverage = coveredSeconds / totalSeconds;
+
+          if (coverage < 0.90) {
+            console.log(
+              "[ENERGY CALC] Coverage insufficient:",
+              txid,
+              coverage.toFixed(3)
+            );
+            return;
+          }
+
+          db.run(
+            `UPDATE machine_usage
+             SET energy_calculated_kwh=?
+             WHERE txid=? AND machine=?
+               AND status='FINISHED'`,
+            [energyWh / 1000, txid, machine],
+            function(updateErr) {
+              if (updateErr) {
+                console.error("[ENERGY CALC] Update:", updateErr);
+              } else {
+                console.log(
+                  "[ENERGY CALC]",
+                  txid,
+                  energyWh.toFixed(4),
+                  "Wh",
+                  "coverage:",
+                  coverage.toFixed(3),
+                  "updated:",
+                  this.changes
+                );
+              }
+            }
+          );
+        }
+      );
+    }
+  );
+}
+// ===== END CALCULATED ENERGY =====
+
+// ===== USAGE FINISH START =====
+if (machine === "machine1") {
+  db.get(
+    `SELECT txid, start_energy_kwh, start_water_liters
+     FROM machine_usage
+     WHERE machine=? AND status IN ('STARTED','MISSING_START')
+     ORDER BY started_at DESC LIMIT 1`,
+    [machine],
+    (usageErr, usage) => {
+      if (usageErr || !usage) {
+        if (usageErr) console.error("[USAGE FINISH] Usage DB error:", usageErr);
+        return;
+      }
+
+      db.get(
+        `SELECT energy_kwh, water_liters, received_at
+         FROM machine_telemetry
+         WHERE machine=?
+         ORDER BY id DESC LIMIT 1`,
+        [machine],
+        (meterErr, meter) => {
+          if (meterErr || !meter) {
+            console.error("[USAGE FINISH] No telemetry:", meterErr);
+            return;
+          }
+
+          const ageMs = Date.now() - Date.parse(meter.received_at);
+          const fresh = Number.isFinite(ageMs) &&
+                        ageMs >= 0 && ageMs <= 30000;
+
+          const validEnergy =
+            Number.isFinite(usage.start_energy_kwh) &&
+            Number.isFinite(meter.energy_kwh) &&
+            meter.energy_kwh >= usage.start_energy_kwh;
+
+          const validWater =
+            Number.isFinite(usage.start_water_liters) &&
+            Number.isFinite(meter.water_liters) &&
+            meter.water_liters >= usage.start_water_liters;
+
+          const valid = fresh && validEnergy && validWater;
+
+          db.run(
+            `UPDATE machine_usage
+             SET finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                 end_energy_kwh=?,
+                 end_water_liters=?,
+                 energy_used_kwh=?,
+                 water_used_liters=?,
+                 status=?
+             WHERE txid=?
+               AND status IN ('STARTED','MISSING_START')`,
+            [
+              fresh ? meter.energy_kwh : null,
+              fresh ? meter.water_liters : null,
+              valid ? meter.energy_kwh - usage.start_energy_kwh : null,
+              valid ? meter.water_liters - usage.start_water_liters : null,
+              valid ? "FINISHED" : "INCOMPLETE",
+              usage.txid
+            ],
+            function (err) {
+              if (err) {
+                console.error("[USAGE FINISH] Update error:", err);
+              } else {
+                console.log("[USAGE FINISH]", usage.txid,
+                            "updated:", this.changes);
+
+                if (this.changes === 1 && valid) {
+                  calculateUsageEnergy(usage.txid, machine);
+                }
+              }
+            }
+          );
+        }
+      );
+    }
+  );
+}
+// ===== USAGE FINISH END =====
+
+
   db.run(
     "UPDATE machines SET state='IDLE', reserved_until=NULL WHERE machine=?",
     [machine]
