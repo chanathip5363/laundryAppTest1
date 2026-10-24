@@ -748,7 +748,45 @@ app.get("/fix", (req, res) => {
   res.send("fixed");
 });
 
- app.get("/machines", (req, res) => {
+
+// ===== Multi-Shop: Public Machine List =====
+app.get("/shops/:shopId/machines", (req, res) => {
+  const shopId = req.params.shopId;
+
+  db.get(
+    "SELECT shop_id FROM shops WHERE shop_id = ? AND status = 'ACTIVE'",
+    [shopId],
+    (err, shop) => {
+      if (err) {
+        console.error("Shop lookup error:", err);
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      if (!shop) {
+        return res.status(404).json({ error: "Shop not found" });
+      }
+
+      db.all(
+        `SELECT machine, shop_id, machine_type, model,
+                display_name, program_profile, state, status
+         FROM machines
+         WHERE shop_id = ?
+         ORDER BY machine`,
+        [shopId],
+        (err, rows) => {
+          if (err) {
+            console.error("Shop machines error:", err);
+            return res.status(500).json({ error: "Database error" });
+          }
+
+          res.json(rows);
+        }
+      );
+    }
+  );
+});
+
+app.get("/machines", (req, res) => {
   db.all("SELECT * FROM machines", [], (err, rows) => {
     res.json(rows);
   });
