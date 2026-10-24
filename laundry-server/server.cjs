@@ -768,7 +768,7 @@ app.get("/shops/:shopId/machines", (req, res) => {
 
       db.all(
         `SELECT machine, shop_id, machine_type, model,
-                display_name, program_profile, state, status
+                display_name, program_profile, state, status, reserved_until
          FROM machines
          WHERE shop_id = ?
          ORDER BY machine`,
