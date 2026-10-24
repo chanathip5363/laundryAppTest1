@@ -136,7 +136,7 @@ app.post("/webhook", require("./payment-bridge.cjs").authorizeWebhook(db, client
 
     // ตรวจว่าเครื่องถูกจองไว้ และ reservation ยังไม่หมดเวลา
     db.get(
-      "SELECT state, reserved_until FROM machines WHERE machine=?",
+      "SELECT state, reserved_until, shop_id FROM machines WHERE machine=?",
       [machine],
       (err, machineRow) => {
 
@@ -172,8 +172,8 @@ isMachineOnline(machine, (online) => {
     console.log("Machine OFFLINE -> reject payment");
 
     db.run(
-      "INSERT INTO transactions VALUES (?,?,?,?)",
-      [txid, machine, amount, "REJECTED"]
+      "INSERT INTO transactions (txid, machine, amount, status, shop_id) VALUES (?,?,?,?,?)",
+      [txid, machine, amount, "REJECTED", machineRow.shop_id]
     );
 
     return res.sendStatus(200);
@@ -185,16 +185,16 @@ isMachineOnline(machine, (online) => {
         console.log("Machine busy -> reject payment");
 
         db.run(
-          "INSERT INTO transactions VALUES (?,?,?,?)",
-          [txid, machine, amount, "REJECTED"]
+          "INSERT INTO transactions (txid, machine, amount, status, shop_id) VALUES (?,?,?,?,?)",
+          [txid, machine, amount, "REJECTED", machineRow.shop_id]
         );
         return res.sendStatus(200);
       }
 
       // 3. บันทึก transaction
       db.run(
-        "INSERT OR IGNORE INTO transactions VALUES (?,?,?,?)",
-        [txid, machine, amount, "SUCCESS"],
+        "INSERT OR IGNORE INTO transactions (txid, machine, amount, status, shop_id) VALUES (?,?,?,?,?)",
+        [txid, machine, amount, "SUCCESS", machineRow.shop_id],
         function (err) {
           if (err) {
             console.log("DB error:", err);
