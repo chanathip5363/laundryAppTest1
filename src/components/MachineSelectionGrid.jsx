@@ -56,6 +56,7 @@ function MachineIcon({ type }) {
 
 
 export default function MachineSelectionGrid({
+  shopId,
   machines,
   onSelect,
   onBack,
@@ -75,7 +76,7 @@ export default function MachineSelectionGrid({
 
       try {
         const response = await fetch(
-          "https://api.the-oasis-living.com/machines",
+          `https://api.the-oasis-living.com/shops/${encodeURIComponent(shopId)}/machines`,
           { cache: "no-store" }
         );
 
@@ -119,7 +120,7 @@ export default function MachineSelectionGrid({
       active = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [shopId]);
 
   const getMachineState = (id) => {
     if (loading || serverError) {
@@ -189,7 +190,11 @@ export default function MachineSelectionGrid({
               disabled={!state.available}
               onClick={() => {
                 if (state.available) {
-                  onSelect(machine);
+                  onSelect({
+                    ...machine,
+                    program_profile:
+                      machineStatus[machine.id]?.program_profile ?? null,
+                  });
                 }
               }}
             >

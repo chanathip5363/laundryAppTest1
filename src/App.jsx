@@ -30,6 +30,7 @@ import DryMachineSelection from "./components/DryMachineSelection";
 import QRPayment from "./components/QRPayment";
 import DrySelection from "./components/DrySelection";
 import getMachineConfig from "./config/getMachineConfig";
+import getMachineConfigByProfile from "./config/getMachineConfigByProfile";
 import {
   tempOptionsMap,
   tempShowOptionsMap,
@@ -42,6 +43,9 @@ import {
 const PAYMENT_API = "https://api.the-oasis-living.com";
 
 function App() {
+  const shopId =
+    new URLSearchParams(window.location.search).get("shop") || "shop001";
+
   const [client, setClient] = useState(null);
   const [status, setStatus] = useState("Disconnected");
   const [program, setProgram] = useState(0);
@@ -52,6 +56,7 @@ const [step, setStep] = useState(1);
 const SHOW_TEST_BUTTONS = true;
 const [mode, setMode] = useState(null);
 const [selectedMachine, setSelectedMachine] = useState(null);
+const [selectedMachineProfile, setSelectedMachineProfile] = useState(null);
 const [reservedUntil, setReservedUntil] = useState(null);
 
 useEffect(() => {
@@ -60,7 +65,9 @@ useEffect(() => {
   }
 }, [selectedMachine]);
 
-const selectedMachineConfig = getMachineConfig(selectedMachine);
+const selectedMachineConfig =
+  getMachineConfigByProfile(selectedMachineProfile) ??
+  getMachineConfig(selectedMachine);
 
 const configProgramNameMap =
   selectedMachineConfig?.config?.programs
@@ -607,8 +614,10 @@ return (
 {/* STEP 1_1 */}
 {step === 1_1 && (
   <WashMachineSelection
+    shopId={shopId}
     selectedMachine={selectedMachine}
     setSelectedMachine={setSelectedMachine}
+    setSelectedMachineProfile={setSelectedMachineProfile}
     setStep={setStep}
   />
 )}
@@ -616,8 +625,10 @@ return (
 {/* STEP 1_2 */}
 {step === 1_2 && (
   <DryMachineSelection
+    shopId={shopId}
     selectedMachine={selectedMachine}
     setSelectedMachine={setSelectedMachine}
+    setSelectedMachineProfile={setSelectedMachineProfile}
     setStep={setStep}
   />
 )}

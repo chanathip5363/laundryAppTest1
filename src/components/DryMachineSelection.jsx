@@ -2,8 +2,10 @@
 import MachineSelectionGrid from "./MachineSelectionGrid";
 
 export default function DryMachineSelection({
+  shopId,
   selectedMachine,
   setSelectedMachine,
+  setSelectedMachineProfile,
   setStep,
 }) {
   const machines = [
@@ -15,14 +17,17 @@ export default function DryMachineSelection({
 
   return (
     <MachineSelectionGrid
+      shopId={shopId}
       machines={machines}
       type="dry"
       onSelect={(machine) => {
         setSelectedMachine(machine.id);
+        setSelectedMachineProfile(machine.program_profile);
         setStep(machine.nextStep);
       }}
       onBack={() => {
         setSelectedMachine(null);
+        setSelectedMachineProfile(null);
         setStep(1);
       }}
     />
