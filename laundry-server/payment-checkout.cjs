@@ -76,7 +76,7 @@ async function createCheckout(input, {
       [input.machine, isTest ? 1 : 0, now]
     );
 
-    const order = await createOrder(db, input, { isTest });
+    const order = await createOrder(db, input, { isTest, shopId: machine.shop_id });
 
     const reserved = await run(
       `UPDATE machines

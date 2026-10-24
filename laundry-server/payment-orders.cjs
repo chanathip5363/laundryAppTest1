@@ -21,7 +21,8 @@ function initializeOrders(db) {
             'REVIEW_REQUIRED'
           )),
         is_test INTEGER NOT NULL DEFAULT 0
-          CHECK (is_test IN (0, 1))
+          CHECK (is_test IN (0, 1)),
+        shop_id TEXT
       )
     `, err => {
       if (err) reject(err);

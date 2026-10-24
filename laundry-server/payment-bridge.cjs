@@ -28,7 +28,7 @@ function selection(input) {
   return { command, amountSatang };
 }
 
-async function saveSelectedOrder(db, input, { isTest = false } = {}) {
+async function saveSelectedOrder(db, input, { isTest = false, shopId } = {}) {
   const { command, amountSatang } = selection(input);
   await initializeReceipts(db);
   await require('./payment-discount.cjs').assertBaseAmountAvailable(db, amountSatang, isTest);
@@ -40,10 +40,10 @@ async function saveSelectedOrder(db, input, { isTest = false } = {}) {
   const snapshot = { source: 'existing-react', amount: command.amount, amountSatang };
   await new Promise((resolve, reject) => {
     db.run(`INSERT INTO payment_orders
-      (txid,machine,service,program,options_json,amount_satang,price_snapshot_json,created_at,expires_at,status,is_test)
-      VALUES (?,?,?,?,?,?,?,?,?,'PENDING',?)`,
+      (txid,machine,service,program,options_json,amount_satang,price_snapshot_json,created_at,expires_at,status,is_test,shop_id)
+      VALUES (?,?,?,?,?,?,?,?,?,'PENDING',?,?)`,
     [txid,command.machine,command.type,command.program,JSON.stringify(options),amountSatang,
-      JSON.stringify(snapshot),createdAt,expiresAt,isTest ? 1 : 0],
+      JSON.stringify(snapshot),createdAt,expiresAt,isTest ? 1 : 0,shopId],
     err => err ? reject(err) : resolve());
   });
   return { txid, machine: command.machine, type: command.type, program: command.program,

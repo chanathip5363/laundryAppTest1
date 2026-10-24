@@ -19,8 +19,8 @@ const get = (sql, params = []) => new Promise((resolve, reject) => {
   db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
 });
 async function test() {
-  await run('CREATE TABLE machines (machine TEXT PRIMARY KEY,state TEXT,status TEXT,reserved_until INTEGER)');
-  await run("INSERT INTO machines VALUES ('machine1','IDLE','ONLINE',NULL)");
+  await run('CREATE TABLE machines (machine TEXT PRIMARY KEY,state TEXT,status TEXT,reserved_until INTEGER,shop_id TEXT)');
+  await run("INSERT INTO machines VALUES ('machine1','IDLE','ONLINE',NULL,'shop001')");
   await run('CREATE TABLE sms_messages (id INTEGER PRIMARY KEY)');
   await run('CREATE TABLE transactions (txid TEXT PRIMARY KEY,machine TEXT,amount INTEGER,status TEXT)');
   const app = express();
@@ -53,6 +53,8 @@ async function test() {
   const txid=first.body.txid;
   const order=await get('SELECT * FROM payment_orders WHERE txid=?',[txid]);
   assert.deepEqual(JSON.parse(order.options_json).command,input);
+  assert.equal(order.shop_id,'shop001');
+  console.log('ผ่าน: payment_orders บันทึก shop_id = shop001');
   console.log('ผ่าน: เก็บยอดและคำสั่งเดิมของ React โดยไม่ใช้ตารางราคาใหม่ จอง 2 นาที');
   assert.equal((await post('/payments/session',input)).status,409);
   assert.equal((await post('/webhook',{txid})).status,403);
