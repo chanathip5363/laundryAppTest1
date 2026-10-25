@@ -394,7 +394,9 @@ client.subscribe("laundry/+/state");
 
 client.on("message", (topic, message)=>{
         // ===== บันทึกข้อมูลไฟฟ้าและน้ำจาก ESP32 =====
-    if (topic === "laundry/machine1/telemetry") {
+    const telemetryMatch = /^laundry\/([^/]+)\/telemetry$/.exec(topic);
+    if (telemetryMatch) {
+      const telemetryMachine = telemetryMatch[1];
       let data;
 
       try {
@@ -422,24 +424,35 @@ client.on("message", (topic, message)=>{
         return;
       }
 
-      db.run(
-        `INSERT INTO machine_telemetry
-         (machine, voltage, current, power, energy_kwh, water_liters)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          "machine1",
-          data.voltage,
-          data.current,
-          data.power,
-          data.energy_kwh,
-          data.water_liters
-        ],
-        function(err) {
-          if (err) {
-            console.error("[TELEMETRY] DB ERROR:", err.message);
-          } else {
-            console.log("[TELEMETRY] machine1 saved:", this.lastID);
+      db.get(
+        "SELECT machine FROM machines WHERE machine = ?",
+        [telemetryMachine],
+        (lookupErr, row) => {
+          if (lookupErr || !row) {
+            console.error("[TELEMETRY] Unknown machine:", telemetryMachine, lookupErr?.message || "");
+            return;
           }
+
+          db.run(
+            `INSERT INTO machine_telemetry
+             (machine, voltage, current, power, energy_kwh, water_liters)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              telemetryMachine,
+              data.voltage,
+              data.current,
+              data.power,
+              data.energy_kwh,
+              data.water_liters
+            ],
+            function(err) {
+              if (err) {
+                console.error("[TELEMETRY] DB ERROR:", err.message);
+              } else {
+                console.log("[TELEMETRY]", telemetryMachine, "saved:", this.lastID);
+              }
+            }
+          );
         }
       );
 
