@@ -21,6 +21,15 @@ export default function AdminApp() {
   const [createShopError, setCreateShopError] = useState("");
   const [createShopSuccess, setCreateShopSuccess] = useState("");
 
+  const [newMachineId, setNewMachineId] = useState("");
+  const [newMachineType, setNewMachineType] = useState("wash");
+  const [newMachineModel, setNewMachineModel] = useState("");
+  const [newMachineName, setNewMachineName] = useState("");
+  const [newMachineProfile, setNewMachineProfile] = useState("");
+  const [creatingMachine, setCreatingMachine] = useState(false);
+  const [createMachineError, setCreateMachineError] = useState("");
+  const [createMachineSuccess, setCreateMachineSuccess] = useState("");
+
   async function handleLogin(event) {
     event.preventDefault();
     setError("");
@@ -103,7 +112,64 @@ export default function AdminApp() {
     }
   }
 
+  async function handleCreateMachine(event) {
+    event.preventDefault();
+    if (!selectedShop || creatingMachine || machinesLoading) return;
+
+    setCreateMachineError("");
+    setCreateMachineSuccess("");
+    setCreatingMachine(true);
+
+    try {
+      const shopId = selectedShop.shop_id;
+      const response = await fetch(
+        `${API}/admin/shops/${encodeURIComponent(shopId)}/machines`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            machine: newMachineId.trim(),
+            machine_type: newMachineType,
+            model: newMachineModel.trim() || null,
+            display_name: newMachineName.trim(),
+            program_profile: newMachineProfile.trim() || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          throw new Error("รหัสเครื่องนี้มีอยู่แล้ว");
+        }
+        if (response.status === 404) {
+          throw new Error("ไม่พบร้านที่เลือก");
+        }
+        if (response.status === 400) {
+          throw new Error("ข้อมูลเครื่องไม่ถูกต้อง");
+        }
+        throw new Error("ไม่สามารถเพิ่มเครื่องได้");
+      }
+
+      const data = await response.json();
+      setMachines((previous) => [...previous, data.machine]);
+      setNewMachineId("");
+      setNewMachineModel("");
+      setNewMachineName("");
+      setNewMachineProfile("");
+      setCreateMachineSuccess("ลงทะเบียนเครื่องใหม่สำเร็จ");
+    } catch (err) {
+      setCreateMachineError(err.message);
+    } finally {
+      setCreatingMachine(false);
+    }
+  }
+
   async function handleSelectShop(shop) {
+    setCreateMachineError("");
+    setCreateMachineSuccess("");
     setSelectedShop(shop);
     setMachines([]);
     setMachinesError("");
@@ -220,6 +286,71 @@ export default function AdminApp() {
                 <p>ยังไม่มีเครื่องในร้านนี้</p>}
 
               <ul>
+              <h4>ลงทะเบียนเครื่องใหม่</h4>
+              <form onSubmit={handleCreateMachine}>
+                <label htmlFor="new-machine-id">รหัสเครื่อง</label>
+                <input
+                  id="new-machine-id"
+                  value={newMachineId}
+                  onChange={(e) => setNewMachineId(e.target.value)}
+                  placeholder="เช่น machine9"
+                  pattern="machine[0-9]+"
+                  required
+                  style={{ display: "block", width: "100%", marginBottom: 12 }}
+                />
+
+                <label htmlFor="new-machine-type">ประเภทเครื่อง</label>
+                <select
+                  id="new-machine-type"
+                  value={newMachineType}
+                  onChange={(e) => setNewMachineType(e.target.value)}
+                  style={{ display: "block", width: "100%", marginBottom: 12 }}
+                >
+                  <option value="wash">เครื่องซัก</option>
+                  <option value="dry">เครื่องอบ</option>
+                </select>
+
+                <label htmlFor="new-machine-model">ยี่ห้อ / รุ่น</label>
+                <input
+                  id="new-machine-model"
+                  value={newMachineModel}
+                  onChange={(e) => setNewMachineModel(e.target.value)}
+                  maxLength={100}
+                  style={{ display: "block", width: "100%", marginBottom: 12 }}
+                />
+
+                <label htmlFor="new-machine-name">ชื่อแสดงบนเว็บไซต์</label>
+                <input
+                  id="new-machine-name"
+                  value={newMachineName}
+                  onChange={(e) => setNewMachineName(e.target.value)}
+                  maxLength={100}
+                  required
+                  style={{ display: "block", width: "100%", marginBottom: 12 }}
+                />
+
+                <label htmlFor="new-machine-profile">Program Profile</label>
+                <input
+                  id="new-machine-profile"
+                  value={newMachineProfile}
+                  onChange={(e) => setNewMachineProfile(e.target.value)}
+                  placeholder="เช่น toshibaA (ถ้ามี)"
+                  maxLength={100}
+                  style={{ display: "block", width: "100%", marginBottom: 12 }}
+                />
+
+                <button type="submit" disabled={creatingMachine || machinesLoading}>
+                  {creatingMachine ? "กำลังบันทึก..." : "เพิ่มเครื่องใหม่"}
+                </button>
+
+                {createMachineError && (
+                  <p role="alert" style={{ color: "red" }}>{createMachineError}</p>
+                )}
+                {createMachineSuccess && (
+                  <p role="status">{createMachineSuccess}</p>
+                )}
+              </form>
+
                 {machines.map((machine) => (
                   <li key={machine.machine}>
                     {machine.display_name || machine.machine}
