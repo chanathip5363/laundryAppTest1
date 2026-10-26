@@ -2,8 +2,15 @@ import toshibaA from "./configurations/toshibaA";
 import tclB from "./configurations/tclB";
 import lgC from "./configurations/lgC";
 import samsungD from "./configurations/samsungD";
+import tclDry1 from "./configurations/tclDry1";
 
 const profiles = {
+  tclDry1: {
+    service: "dry",
+    brand: "TCL",
+    model: "Dry1",
+    config: tclDry1,
+  },
   toshibaA: {
     service: "wash",
     brand: "Toshiba",

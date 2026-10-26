@@ -1,5 +1,7 @@
 
 function Wash30ProgramSelection({
+  packagePrice,
+  priceGroupPrograms,
   programNameMap,
   setProgram,
   setProgramPrice,
@@ -53,18 +55,22 @@ function Wash30ProgramSelection({
 
   const handleSelect = (programId) => {
     setProgram(programId);
-    setProgramPrice(30);
+    setProgramPrice(packagePrice);
     setStep(2_2_1);
   };
 
   return (
     <div className="wash30-selection">
       <p className="wash30-subtitle">
-        แพ็กเกจซักมาตรฐาน 30 บาท
+        แพ็กเกจซักมาตรฐาน {packagePrice} บาท
       </p>
 
       <div className="wash30-program-list">
-        {programs.map((item) => (
+        {programs
+          .filter((item) =>
+            priceGroupPrograms.some((id) => Number(id) === item.id)
+          )
+          .map((item) => (
           <button
             key={item.id}
             type="button"

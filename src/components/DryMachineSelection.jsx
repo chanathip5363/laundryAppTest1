@@ -21,9 +21,19 @@ export default function DryMachineSelection({
       machines={machines}
       type="dry"
       onSelect={(machine) => {
+        const nextStep =
+          machine.program_profile === "tclDry1"
+            ? 3_1
+            : machine.nextStep;
+
+        if (nextStep === undefined) {
+          console.warn("Dryer route not configured:", machine.id);
+          return;
+        }
+
         setSelectedMachine(machine.id);
         setSelectedMachineProfile(machine.program_profile);
-        setStep(machine.nextStep);
+        setStep(nextStep);
       }}
       onBack={() => {
         setSelectedMachine(null);

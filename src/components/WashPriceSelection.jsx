@@ -1,13 +1,93 @@
+import { useEffect, useState } from "react";
+
 
 function WashPriceSelection({
+  selectedMachine,
+  onPricingLoaded,
   onSelect20,
   onSelect30,
   onSelect50,
   onBack,
 }) {
+  const [pricing, setPricing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    setPricing(null);
+    setLoading(true);
+    setError("");
+
+    if (!selectedMachine) {
+      setError("กรุณาเลือกเครื่องซักผ้า");
+      setLoading(false);
+      return () => controller.abort();
+    }
+
+    async function loadPricing() {
+      try {
+        const response = await fetch(
+          `https://api.the-oasis-living.com/payments/pricing/${encodeURIComponent(selectedMachine)}`,
+          { signal: controller.signal, cache: "no-store" }
+        );
+
+        if (!response.ok) {
+          throw new Error("ไม่สามารถโหลดราคาของเครื่องได้");
+        }
+
+        const data = await response.json();
+
+        if (
+          !data.success ||
+          data.machine !== selectedMachine ||
+          data.type !== "wash" ||
+          !data.priceGroups ||
+          typeof data.priceGroups !== "object" ||
+          Array.isArray(data.priceGroups)
+        ) {
+          throw new Error("ข้อมูลราคาจาก Server ไม่ถูกต้อง");
+        }
+
+        if (!controller.signal.aborted) {
+          setPricing(data);
+          onPricingLoaded(data);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(err.message);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadPricing();
+
+    return () => controller.abort();
+  }, [selectedMachine, onPricingLoaded]);
+
+  const findGroupPrice = (programIds) => {
+    if (!pricing?.priceGroups) return null;
+
+    const match = Object.entries(pricing.priceGroups).find(
+      ([, programs]) =>
+        Array.isArray(programs) &&
+        programs.some((id) => programIds.includes(Number(id)))
+    );
+
+    if (!match) return null;
+
+    const price = Number(match[0]);
+    return Number.isFinite(price) && price > 0 ? price : null;
+  };
+
   const packages = [
     {
-      price: 20,
+      price: findGroupPrice([4, 6]),
       name: "ซักประหยัด",
       subtitle: "เหมาะสำหรับผ้าปริมาณน้อย",
       details: [
@@ -19,7 +99,7 @@ function WashPriceSelection({
       theme: "basic",
     },
     {
-      price: 30,
+      price: findGroupPrice([1, 2, 3, 5, 7, 8, 9]),
       name: "ซักมาตรฐาน",
       subtitle: "เลือกโปรแกรมให้เหมาะกับเนื้อผ้า",
       details: [
@@ -33,7 +113,7 @@ function WashPriceSelection({
       theme: "standard",
     },
     {
-      price: 50,
+      price: findGroupPrice([10]),
       name: "ซักด้วยไอน้ำ",
       subtitle: "โปรแกรมซักพิเศษ",
       details: [
@@ -53,7 +133,12 @@ function WashPriceSelection({
       </div>
 
       <div className="wash-price-grid">
-        {packages.map((pkg) => (
+        {loading && <p>กำลังโหลดราคา...</p>}
+        {!loading && error && <p role="alert">{error}</p>}
+        {!loading && !error && pricing &&
+          packages
+            .filter((pkg) => pkg.price !== null)
+            .map((pkg) => (
           <div
             key={pkg.price}
             className={`wash-price-card ${pkg.theme}`}
@@ -82,7 +167,7 @@ function WashPriceSelection({
             <button
               type="button"
               className="wash-price-button"
-              onClick={pkg.onSelect}
+              onClick={() => pkg.onSelect(pkg.price)}
             >
               เลือกแพ็กเกจ {pkg.price} บาท
               <span>→</span>

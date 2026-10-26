@@ -57,6 +57,13 @@ const SHOW_TEST_BUTTONS = true;
 const [mode, setMode] = useState(null);
 const [selectedMachine, setSelectedMachine] = useState(null);
 const [selectedMachineProfile, setSelectedMachineProfile] = useState(null);
+const [washPricing, setWashPricing] = useState(null);
+const activeWashPricing =
+  washPricing?.machine === selectedMachine ? washPricing : null;
+
+useEffect(() => {
+  setWashPricing(null);
+}, [selectedMachine]);
 const [reservedUntil, setReservedUntil] = useState(null);
 
 useEffect(() => {
@@ -79,8 +86,9 @@ const configProgramNameMap =
     : programNameMap;
 
 const configTempPriceMap =
-  selectedMachineConfig?.config?.temperaturePrice
-    ?? tempPriceMap;
+  activeWashPricing?.temperaturePrice ??
+  selectedMachineConfig?.config?.temperaturePrice ??
+  tempPriceMap;
 const configTempOptionsMap =
   selectedMachineConfig?.config?.programs
     ? Object.fromEntries(
@@ -90,7 +98,9 @@ const configTempOptionsMap =
       )
     : tempOptionsMap;    
 const configAromaPrice =
-  selectedMachineConfig?.config?.aromaPrice ?? 5;
+  activeWashPricing?.aromaPrice ??
+  selectedMachineConfig?.config?.aromaPrice ??
+  5;
 
 const configAromaOptionsMap =
   selectedMachineConfig?.config?.programs
@@ -141,6 +151,28 @@ const [dry3WrinkleOption, setDry3WrinkleOption] = useState(false);
 
 const [dry4TemperatureOption, setDry4TemperatureOption] = useState(null);
 const [dry4WrinkleOption, setDry4WrinkleOption] = useState(false);
+
+const resetDryOptions = () => {
+  setDry1Prices(0);
+  setDry1Program(0);
+  setDry1TemperatureOption(null);
+  setDry1WrinkleOption(false);
+
+  setDry2Prices({});
+  setDry2Program({});
+  setDry2TemperatureOption(null);
+  setDry2WrinkleOption(false);
+
+  setDry3Prices({});
+  setDry3Program({});
+  setDry3TemperatureOption(null);
+  setDry3WrinkleOption(false);
+
+  setDry4Prices({});
+  setDry4Program({});
+  setDry4TemperatureOption(null);
+  setDry4WrinkleOption(false);
+};
 
 const getDry1TotalPrice = () => {
   return calculateDryTotalPrice({
@@ -236,6 +268,14 @@ return calculateTotalPrice({
 };
 
 const getPaymentTotal = () => {
+  if (
+    mode === "dry" &&
+    selectedMachineConfig?.service === "dry" &&
+    selectedMachineConfig?.config?.dryerType === "dry1"
+  ) {
+    return getDry1TotalPrice();
+  }
+
   if (mode === "dry" && selectedMachine === "machine5") {
     return getDry1TotalPrice();
   }
@@ -336,7 +376,9 @@ const [aromaSelected, setAromaSelected] = useState(null);
   const buildPaymentSelection = () => {
 const machine = selectedMachine;
 const paymentProgram =
-        mode === "dry" && selectedMachine === "machine5"
+        mode === "dry" &&
+        (selectedMachineConfig?.config?.dryerType === "dry1" ||
+          selectedMachine === "machine5")
           ? dry1program
           : mode === "dry" && selectedMachine === "machine6"
           ? dry2program
@@ -397,15 +439,44 @@ mode === "dry"
                 program: paymentProgram,
                 tempPulse: paymentTempPulse,
                 aromaPulse: paymentAromaPulse,
+                tempOption: tempOption ?? null,
+                aromaOption: Boolean(aromaOption),
               }
 );
 };
 
 const beginPayment = async () => {
+    const selection = buildPaymentSelection();
+
+    const quoteRes = await fetch(`${PAYMENT_API}/payments/quote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(selection),
+      signal: AbortSignal.timeout(15000)
+    });
+    const quote = await quoteRes.json();
+    if (!quoteRes.ok || !quote.success ||
+        !Number.isSafeInteger(quote.amountSatang) ||
+        quote.amountSatang <= 0) {
+      throw new Error(quote.message || "ไม่สามารถตรวจสอบราคาจาก Server ได้");
+    }
+
+    if (
+      selection.type === "wash" &&
+      Math.round(selection.amount * 100) !== quote.amountSatang
+    ) {
+      throw new Error(
+        "ราคามีการเปลี่ยนแปลง กรุณาย้อนกลับไปเลือกโปรแกรมใหม่ก่อนชำระเงิน"
+      );
+    }
+
     const res = await fetch(`${PAYMENT_API}/payments/session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildPaymentSelection()),
+      body: JSON.stringify({
+        ...selection,
+        amount: quote.amountSatang / 100
+      }),
       signal: AbortSignal.timeout(15000)
     });
     const data = await res.json();
@@ -557,11 +628,15 @@ return (
       onSelectWash={() => {
         setMode("wash");
         setSelectedMachine(null);
+        setSelectedMachineProfile(null);
+        resetDryOptions();
         setStep(1_1);
       }}
       onSelectDry={() => {
         setMode("dry");
         setSelectedMachine(null);
+        setSelectedMachineProfile(null);
+        resetDryOptions();
         setStep(1_2);
       }}
     />
@@ -636,21 +711,24 @@ return (
 {/* STEP 2 */}
 {step === 2 && (
   <WashPriceSelection
-    onSelect20={() => {
-      setPrices(20);
+    selectedMachine={selectedMachine}
+    onPricingLoaded={setWashPricing}
+    onPricingLoaded={setWashPricing}
+    onSelect20={(price) => {
+      setPrices(price);
       setStep(2_1);
     }}
 
-    onSelect30={() => {
-      setPrices(30);
+    onSelect30={(price) => {
+      setPrices(price);
       setStep(2_2);
     }}
 
-    onSelect50={() => {
-      setPrices(50);
+    onSelect50={(price) => {
+      setPrices(price);
       setStep(2_3);
       setProgram(10);
-      setProgramPrice(50);
+      setProgramPrice(price);
     }}
 
     onBack={() => setStep(1_1)}
@@ -660,6 +738,7 @@ return (
 {/* STEP 2_1 */}
 {step === 2_1 && (
   <Wash20Selection
+    packagePrice={prices}
     program={program}
     programNameMap={configProgramNameMap}
     getTotalPrice={getTotalPrice}
@@ -673,7 +752,11 @@ return (
     checkMachineBeforePay={checkMachineBeforePay}
     STEP_QR={STEP_QR}
     priceGroupPrograms={
-      selectedMachineConfig?.config?.priceGroups?.[20] ?? [4, 6]
+      Object.entries(activeWashPricing?.priceGroups ?? {})
+        .find(([, programs]) =>
+          Array.isArray(programs) &&
+          programs.some((id) => [4, 6].includes(Number(id)))
+        )?.[1] ?? []
     }
   />
 )}
@@ -682,6 +765,16 @@ return (
 {/* STEP 2_2 */}
 {step === 2_2 && (
   <Wash30ProgramSelection
+    packagePrice={prices}
+    priceGroupPrograms={
+      Object.entries(activeWashPricing?.priceGroups ?? {})
+        .find(([, programs]) =>
+          Array.isArray(programs) &&
+          programs.some((id) =>
+            [1, 2, 3, 5, 7, 8, 9].includes(Number(id))
+          )
+        )?.[1] ?? []
+    }
     programNameMap={configProgramNameMap}
     setProgram={setProgram}
     setProgramPrice={setProgramPrice}

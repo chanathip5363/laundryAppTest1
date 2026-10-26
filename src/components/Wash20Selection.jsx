@@ -1,5 +1,6 @@
 ﻿
 function Wash20Selection({
+  packagePrice,
   program,
   programNameMap,
   getTotalPrice,
@@ -58,7 +59,7 @@ function Wash20Selection({
   return (
     <div className="wash20-selection">
     <div className="wash20-heading">
-      <p>แพ็กเกจซักประหยัด 20 บาท</p>
+      <p>แพ็กเกจซักประหยัด {packagePrice} บาท</p>
     </div>
 
       <div className="wash20-program-list">
@@ -76,7 +77,7 @@ function Wash20Selection({
               aria-pressed={selected}
               onClick={() => {
                 setProgram(programId);
-                setProgramPrice(20);
+                setProgramPrice(packagePrice);
                 setSpin(0);
                 setAroma(0);
               }}

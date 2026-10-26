@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import getMachineConfigByProfile from "../config/getMachineConfigByProfile";
 
 
 function MachineIcon({ type }) {
@@ -133,6 +134,34 @@ export default function MachineSelectionGrid({
 
     const machine = machineStatus[id];
 
+    if (
+      type === "wash" &&
+      machine &&
+      !getMachineConfigByProfile(machine.program_profile)
+    ) {
+      return {
+        label: "ยังไม่รองรับโปรแกรม",
+        className: "unknown",
+        available: false,
+      };
+    }
+
+    if (type === "dry" && machine) {
+      const legacyDryMachines = ["machine5", "machine6", "machine7", "machine8"];
+      const profile = getMachineConfigByProfile(machine.program_profile);
+
+      if (
+        (!profile || profile.service !== "dry") &&
+        !legacyDryMachines.includes(id)
+      ) {
+        return {
+          label: "ยังไม่รองรับโปรแกรม",
+          className: "unknown",
+          available: false,
+        };
+      }
+    }
+
     if (!machine || machine.status !== "ONLINE") {
       return {
         label: "ออฟไลน์",
@@ -170,6 +199,16 @@ export default function MachineSelectionGrid({
     };
   };
 
+  const displayMachines = Object.values(machineStatus)
+    .filter((machine) => machine.machine_type === type)
+    .map((machine) => ({
+      id: machine.machine,
+      name: machine.display_name || machine.machine,
+      model: machine.model || "",
+      program_profile: machine.program_profile,
+      nextStep: machines?.find((item) => item.id === machine.machine)?.nextStep,
+    }));
+
   return (
     <div className="machine-selection">
       {serverError && (
@@ -179,7 +218,7 @@ export default function MachineSelectionGrid({
       )}
 
       <div className="machine-grid">
-        {machines.map((machine) => {
+        {displayMachines.map((machine) => {
           const state = getMachineState(machine.id);
 
           return (
