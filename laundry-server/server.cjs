@@ -376,6 +376,7 @@ app.post("/request-qr", (req, res) => {
        SET state = 'RESERVED', reserved_until = ?
        WHERE machine = ?
          AND enabled = 1
+         AND deleted_at IS NULL
          AND status = 'ONLINE'
          AND (
            state = 'IDLE'
@@ -804,7 +805,7 @@ app.get("/shops/:shopId/machines", (req, res) => {
         `SELECT machine, shop_id, machine_type, model,
                 display_name, program_profile, state, status, reserved_until
          FROM machines
-         WHERE shop_id = ? AND enabled = 1
+         WHERE shop_id = ? AND enabled = 1 AND deleted_at IS NULL
          ORDER BY machine`,
         [shopId],
         (err, rows) => {

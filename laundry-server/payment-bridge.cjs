@@ -197,7 +197,7 @@ function authorizeWebhook(db, client, { isTest = false } = {}) {
       }
       const machine = await get('SELECT * FROM machines WHERE machine=?', [order.machine]);
       if (!machine || machine.status !== 'ONLINE') return deny(409, 'MACHINE_OFFLINE', 'เครื่องออฟไลน์');
-      if (machine.enabled !== 1) return deny(409, 'MACHINE_DISABLED', 'เครื่องนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแล');
+      if (machine.enabled !== 1 || machine.deleted_at != null) return deny(409, 'MACHINE_DISABLED', 'เครื่องนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแล');
       if (machine.state !== 'RESERVED' || machine.reservation_txid !== txid ||
           !machine.reserved_until || machine.reserved_until <= Date.now() || order.expires_at <= Date.now()) {
         return deny(409, 'RESERVATION_INVALID', 'การจองเครื่องหมดเวลาหรือไม่ตรงกับรายการ กรุณาติดต่อผู้ดูแล');

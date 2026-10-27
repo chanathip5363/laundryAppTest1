@@ -79,6 +79,47 @@ export default function AdminApp() {
   const [updatingMachine, setUpdatingMachine] = useState(null);
   const [updateMachineError, setUpdateMachineError] = useState("");
 
+
+  const [showDeletedMachines, setShowDeletedMachines] = useState(false);
+  const [deletingMachine, setDeletingMachine] = useState(null);
+  const [deleteMachineError, setDeleteMachineError] = useState("");
+
+  async function handleDeleteMachine(machine) {
+    if (!window.confirm(
+      `ยืนยันลบ ${machine.display_name || machine.machine} (${machine.machine}) ออกจากร้าน?\\nประวัติเดิมจะยังถูกเก็บไว้`
+    )) return;
+
+    setDeletingMachine(machine.machine);
+    setDeleteMachineError("");
+
+    try {
+      const response = await fetch(
+        `${API}/admin/shops/${encodeURIComponent(selectedShop.shop_id)}/machines/${encodeURIComponent(machine.machine)}/delete`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(response.status === 409
+          ? "เครื่องกำลังทำงาน ถูกจอง หรือถูกลบไปแล้ว"
+          : "ไม่สามารถลบเครื่องได้");
+      }
+
+      const data = await response.json();
+      setMachines(previous => previous.map(item =>
+        item.machine === machine.machine
+          ? { ...item, enabled: 0, deleted_at: data.deleted_at }
+          : item
+      ));
+    } catch (err) {
+      setDeleteMachineError(err.message);
+    } finally {
+      setDeletingMachine(null);
+    }
+  }
+
   async function handleToggleMachine(machine) {
     if (!selectedShop || updatingMachine) return;
 
@@ -496,7 +537,23 @@ export default function AdminApp() {
                     </button>
                   </form>
                 )}
-                {machines.map((machine) => (
+                <div style={{ marginBottom: 12 }}>
+                  <button type="button" onClick={() => setShowDeletedMachines(false)}>
+                    เครื่องปัจจุบัน ({machines.filter(m => m.deleted_at == null).length})
+                  </button>
+                  {" "}
+                  <button type="button" onClick={() => setShowDeletedMachines(true)}>
+                    เครื่องที่ลบแล้ว ({machines.filter(m => m.deleted_at != null).length})
+                  </button>
+                </div>
+                {deleteMachineError && (
+                  <p role="alert" style={{ color: "red" }}>{deleteMachineError}</p>
+                )}
+                {machines.filter(machine =>
+                  showDeletedMachines
+                    ? machine.deleted_at != null
+                    : machine.deleted_at == null
+                ).map((machine) => (
                   <li key={machine.machine}>
                     {machine.display_name || machine.machine}
                     {" — "}
@@ -506,18 +563,20 @@ export default function AdminApp() {
                     {" "}
                     <button
                       type="button"
-                      disabled={savingMachine || machine.state !== "IDLE"}
+                      disabled={savingMachine || machine.deleted_at != null || machine.state !== "IDLE"}
                       onClick={() => startEditMachine(machine)}
                     >
                       แก้ไขข้อมูล
                     </button>
                     {" — "}
-                    {machine.enabled === 1 ? "เปิดให้บริการ" : "ปิดให้บริการ"}
+                    {machine.deleted_at != null
+                      ? "ลบแล้ว: " + new Date(machine.deleted_at).toLocaleString("th-TH")
+                      : machine.enabled === 1 ? "เปิดให้บริการ" : "ปิดให้บริการ"}
                     {" "}
                     <button
                       type="button"
                       disabled={
-                        updatingMachine !== null ||
+                        machine.deleted_at != null || updatingMachine !== null ||
                         (machine.enabled === 1 && machine.state !== "IDLE")
                       }
                       onClick={() => handleToggleMachine(machine)}
@@ -528,6 +587,23 @@ export default function AdminApp() {
                           ? "ปิดใช้งาน"
                           : "เปิดใช้งาน"}
                     </button>
+                    {machine.deleted_at == null && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          disabled={
+                            deletingMachine !== null ||
+                            machine.state !== "IDLE" ||
+                            (machine.reserved_until != null &&
+                              machine.reserved_until > Date.now())
+                          }
+                          onClick={() => handleDeleteMachine(machine)}
+                        >
+                          {deletingMachine === machine.machine ? "กำลังลบ..." : "ลบเครื่อง"}
+                        </button>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>

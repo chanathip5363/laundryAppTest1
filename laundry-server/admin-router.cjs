@@ -250,7 +250,7 @@ function createAdminRouter(dbPath = "database.db") {
   router.get("/shops/:shopId/machines", requireAdmin, (req, res) => {
     db.all(
       `SELECT machine, shop_id, machine_type, model,
-              display_name, program_profile, state, status, enabled
+              display_name, program_profile, state, status, enabled, deleted_at
        FROM machines
        WHERE shop_id = ?
        ORDER BY machine`,
@@ -426,7 +426,7 @@ function createAdminRouter(dbPath = "database.db") {
       inTransaction = true;
 
       const row = await get(
-        `SELECT machine, state, reserved_until
+        `SELECT machine, state, reserved_until, deleted_at
          FROM machines WHERE machine = ? AND shop_id = ?`,
         [machine, shopId]
       );
@@ -435,6 +435,12 @@ function createAdminRouter(dbPath = "database.db") {
         await run("ROLLBACK");
         inTransaction = false;
         return res.status(404).json({ error: "Machine not found" });
+      }
+
+      if (row.deleted_at != null) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(409).json({ error: "Machine has been deleted" });
       }
 
       if (row.state !== "IDLE" || (row.reserved_until && row.reserved_until > Date.now())) {
@@ -477,6 +483,71 @@ function createAdminRouter(dbPath = "database.db") {
     }
   });
 
+
+  router.patch("/shops/:shopId/machines/:machine/delete", requireAdmin, async (req, res) => {
+    const { shopId, machine } = req.params;
+    const writeDb = new sqlite3.Database(dbPath);
+    const run = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.run(sql, params, function(err) { err ? reject(err) : resolve(this); })
+    );
+    const get = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.get(sql, params, (err, row) => err ? reject(err) : resolve(row))
+    );
+    const close = () => new Promise(resolve => writeDb.close(() => resolve()));
+
+    let inTransaction = false;
+    try {
+      await run("PRAGMA busy_timeout = 10000");
+      await run("BEGIN IMMEDIATE");
+      inTransaction = true;
+
+      const row = await get(
+        `SELECT state, reserved_until, deleted_at
+         FROM machines WHERE machine = ? AND shop_id = ?`,
+        [machine, shopId]
+      );
+
+      if (!row) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(404).json({ error: "Machine not found" });
+      }
+
+      if (row.deleted_at != null) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(409).json({ error: "Machine already deleted" });
+      }
+
+      if (row.state !== "IDLE" ||
+          (row.reserved_until != null && row.reserved_until > Date.now())) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(409).json({ error: "Machine is busy" });
+      }
+
+      const deletedAt = Date.now();
+      await run(
+        `UPDATE machines
+         SET enabled = 0, deleted_at = ?
+         WHERE machine = ? AND shop_id = ? AND deleted_at IS NULL`,
+        [deletedAt, machine, shopId]
+      );
+
+      await run("COMMIT");
+      inTransaction = false;
+      return res.json({ machine, shop_id: shopId, enabled: 0, deleted_at: deletedAt });
+    } catch (err) {
+      if (inTransaction) {
+        try { await run("ROLLBACK"); } catch (_) {}
+      }
+      console.error("Machine soft delete failed:", err);
+      return res.status(500).json({ error: "Machine delete failed" });
+    } finally {
+      await close();
+    }
+  });
+
   router.patch("/shops/:shopId/machines/:machine/enabled", requireAdmin, async (req, res) => {
     const { shopId, machine } = req.params;
     const { enabled } = req.body || {};
@@ -505,7 +576,7 @@ function createAdminRouter(dbPath = "database.db") {
       inTransaction = true;
 
       const row = await get(
-        "SELECT machine, state, reserved_until, enabled FROM machines WHERE machine = ? AND shop_id = ?",
+        "SELECT machine, state, reserved_until, enabled, deleted_at FROM machines WHERE machine = ? AND shop_id = ?",
         [machine, shopId]
       );
 
@@ -513,6 +584,12 @@ function createAdminRouter(dbPath = "database.db") {
         await run("ROLLBACK");
         inTransaction = false;
         return res.status(404).json({ error: "Machine not found" });
+      }
+
+      if (row.deleted_at != null) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(409).json({ error: "Machine has been deleted" });
       }
 
       if (!enabled && (
