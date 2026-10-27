@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
 import getMachineConfigByProfile from "../config/getMachineConfigByProfile";
+import MachineRunTime from "./MachineRunTime";
 
 
 function MachineIcon({ type }) {
@@ -253,6 +254,7 @@ export default function MachineSelectionGrid({
                 {state.label}
               </span>
 
+              <MachineRunTime machine={machineStatus[machine.id]} />
               <span className="machine-card-action">
                 {state.available
                   ? "เลือกเครื่องนี้ →"

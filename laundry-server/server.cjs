@@ -6,6 +6,7 @@ const sqlite3 = require("sqlite3").verbose();
 const cors = require("cors")
 
 const { createAdminRouter } = require("./admin-router.cjs");
+const { estimateMinutes } = require("./machine-time.cjs");
 
 const app = express();
 app.use((req, res, next) => req.path.startsWith("/admin/") ? next() : cors()(req, res, next));
@@ -33,6 +34,15 @@ client.on("connect", () => {
 
 // ===== DATABASE =====
 const db = new sqlite3.Database("./database.db");
+// One row per machine; a new STARTING -> RUNNING transition replaces the prior cycle.
+db.run(`CREATE TABLE IF NOT EXISTS machine_run_clock (
+  machine TEXT PRIMARY KEY,
+  txid TEXT,
+  started_at INTEGER NOT NULL,
+  estimated_minutes INTEGER,
+  program INTEGER
+)`);
+
 
  db.run(`
   ALTER TABLE machines ADD COLUMN reserved_until INTEGER
@@ -710,13 +720,33 @@ if (type === "state" && msg === "IDLE") {
   );
 }
 
-    if(type === "state" && msg === "RUNNING"){
-    db.run(
-      "UPDATE machines SET state=? WHERE machine=?",
-      ["RUNNING", machine]
-    );
-    console.log("Machine Set to RUNNING:", machine)
-}
+    if (type === "state" && msg === "RUNNING") {
+      // Record a start exactly once per STARTING -> RUNNING transition.
+      db.run("UPDATE machines SET state='RUNNING' WHERE machine=? AND state='STARTING'",
+        [machine], function(err) {
+          if (err) return console.error('[RUN CLOCK] State update:', err);
+          if (this.changes !== 1) return; // repeated RUNNING or recovery: do not reset time
+          const startedAt = Date.now();
+          db.get(`SELECT m.reservation_txid, m.program_profile,
+                         o.txid AS order_txid, o.program, o.options_json
+                  FROM machines m LEFT JOIN payment_orders o
+                    ON o.txid=m.reservation_txid AND o.machine=m.machine
+                   AND o.service='wash' AND o.created_at >= ?
+                  WHERE m.machine=?`,
+            [startedAt - 6 * 60 * 60 * 1000, machine], (lookupErr, row) => {
+              if (lookupErr) return console.error('[RUN CLOCK] Order lookup:', lookupErr);
+              const txid = row?.order_txid || null;
+              const estimated = txid ? estimateMinutes(row.program_profile, row.program, row.options_json) : null;
+              db.run(`INSERT INTO machine_run_clock(machine,txid,started_at,estimated_minutes,program)
+                      VALUES(?,?,?,?,?)
+                      ON CONFLICT(machine) DO UPDATE SET
+                        txid=excluded.txid, started_at=excluded.started_at,
+                        estimated_minutes=excluded.estimated_minutes, program=excluded.program`,
+                [machine, txid, startedAt, estimated, txid ? row.program : null],
+                clockErr => { if (clockErr) console.error('[RUN CLOCK] Save:', clockErr); });
+            });
+        });
+    }
     
 if(type === "status" && (msg === "ONLINE" || msg === "OFFLINE")){
 db.run(
@@ -803,7 +833,13 @@ app.get("/shops/:shopId/machines", (req, res) => {
 
       db.all(
         `SELECT machine, shop_id, machine_type, model,
-                display_name, program_profile, state, status, reserved_until
+                display_name, program_profile, state, status, reserved_until,
+                CASE WHEN state='RUNNING' THEN
+                  (SELECT started_at FROM machine_run_clock c WHERE c.machine=machines.machine)
+                END AS run_started_at,
+                CASE WHEN state='RUNNING' THEN
+                  (SELECT estimated_minutes FROM machine_run_clock c WHERE c.machine=machines.machine)
+                END AS estimated_minutes
          FROM machines
          WHERE shop_id = ? AND enabled = 1 AND deleted_at IS NULL
          ORDER BY machine`,

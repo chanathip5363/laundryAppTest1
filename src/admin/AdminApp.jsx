@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import MachineRunTime from "../components/MachineRunTime";
 
 const API = "https://api.the-oasis-living.com";
 
@@ -317,6 +318,31 @@ export default function AdminApp() {
     }
   }
 
+  // Refresh run-time status without interrupting machine editing forms.
+  useEffect(() => {
+    if (!selectedShop || !token) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await fetch(
+          `${API}/admin/shops/${encodeURIComponent(selectedShop.shop_id)}/machines`,
+          { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!active) return;
+        const incoming = Array.isArray(data) ? data : data.machines || [];
+        setMachines(previous => previous.map(machine => {
+          const fresh = incoming.find(item => item.machine === machine.machine);
+          return fresh ? { ...machine, state: fresh.state, status: fresh.status,
+            run_started_at: fresh.run_started_at, estimated_minutes: fresh.estimated_minutes } : machine;
+        }));
+      } catch { /* retain last known status */ }
+    };
+    const interval = setInterval(refresh, 5000);
+    return () => { active = false; clearInterval(interval); };
+  }, [selectedShop?.shop_id, token]);
+
   async function handleSelectShop(shop) {
     setCreateMachineError("");
     setCreateMachineSuccess("");
@@ -560,6 +586,7 @@ export default function AdminApp() {
                     {machine.machine_type === "wash" ? "เครื่องซัก" : "เครื่องอบ"}
                     {" — "}
                     {machine.status}
+                    <MachineRunTime machine={machine} />
                     {" "}
                     <button
                       type="button"

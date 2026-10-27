@@ -250,7 +250,13 @@ function createAdminRouter(dbPath = "database.db") {
   router.get("/shops/:shopId/machines", requireAdmin, (req, res) => {
     db.all(
       `SELECT machine, shop_id, machine_type, model,
-              display_name, program_profile, state, status, enabled, deleted_at
+              display_name, program_profile, state, status, enabled, deleted_at,
+              CASE WHEN state='RUNNING' THEN
+                (SELECT started_at FROM machine_run_clock c WHERE c.machine=machines.machine)
+              END AS run_started_at,
+              CASE WHEN state='RUNNING' THEN
+                (SELECT estimated_minutes FROM machine_run_clock c WHERE c.machine=machines.machine)
+              END AS estimated_minutes
        FROM machines
        WHERE shop_id = ?
        ORDER BY machine`,
