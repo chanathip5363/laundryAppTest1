@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 export default function MachineRunTime({ machine }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
+    if (machine?.state !== "RUNNING") return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [machine?.state]);
   if (machine?.state !== "RUNNING") return null;
   const started = Number(machine.run_started_at);
   if (!Number.isFinite(started) || started <= 0) {
