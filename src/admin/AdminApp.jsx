@@ -15,6 +15,67 @@ export default function AdminApp() {
   const [machines, setMachines] = useState([]);
   const [machinesError, setMachinesError] = useState("");
   const [machinesLoading, setMachinesLoading] = useState(false);
+  const [editingMachine, setEditingMachine] = useState(null);
+  const [editMachineName, setEditMachineName] = useState("");
+  const [editMachineModel, setEditMachineModel] = useState("");
+  const [editMachineProfile, setEditMachineProfile] = useState("");
+  const [savingMachine, setSavingMachine] = useState(false);
+  const [editMachineError, setEditMachineError] = useState("");
+
+  function startEditMachine(machine) {
+    setEditingMachine(machine.machine);
+    setEditMachineName(machine.display_name || "");
+    setEditMachineModel(machine.model || "");
+    setEditMachineProfile(machine.program_profile || "");
+    setEditMachineError("");
+  }
+
+  async function handleSaveMachine(event) {
+    event.preventDefault();
+    if (!selectedShop || !editingMachine || savingMachine) return;
+
+    setSavingMachine(true);
+    setEditMachineError("");
+
+    try {
+      const response = await fetch(
+        `${API}/admin/shops/${encodeURIComponent(selectedShop.shop_id)}/machines/${encodeURIComponent(editingMachine)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            display_name: editMachineName.trim(),
+            model: editMachineModel.trim(),
+            program_profile: editMachineProfile.trim(),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          response.status === 409
+            ? "เครื่องไม่ว่าง ไม่สามารถแก้ไขข้อมูลได้"
+            : "บันทึกข้อมูลเครื่องไม่สำเร็จ"
+        );
+      }
+
+      const data = await response.json();
+      setMachines(previous => previous.map(machine =>
+        machine.machine === editingMachine
+          ? { ...machine, ...data }
+          : machine
+      ));
+      setEditingMachine(null);
+    } catch (err) {
+      setEditMachineError(err.message);
+    } finally {
+      setSavingMachine(false);
+    }
+  }
+
   const [updatingMachine, setUpdatingMachine] = useState(null);
   const [updateMachineError, setUpdateMachineError] = useState("");
 
@@ -395,6 +456,46 @@ export default function AdminApp() {
                     {updateMachineError}
                   </p>
                 )}
+                {editingMachine && (
+                  <form onSubmit={handleSaveMachine}>
+                    <h4>แก้ไขข้อมูล {editingMachine}</h4>
+                    <label>ชื่อแสดงบนเว็บไซต์
+                      <input
+                        value={editMachineName}
+                        onChange={e => setEditMachineName(e.target.value)}
+                        maxLength={100}
+                        required
+                      />
+                    </label>
+                    <label>ยี่ห้อ / รุ่น
+                      <input
+                        value={editMachineModel}
+                        onChange={e => setEditMachineModel(e.target.value)}
+                        maxLength={100}
+                      />
+                    </label>
+                    <label>Program Profile
+                      <input
+                        value={editMachineProfile}
+                        onChange={e => setEditMachineProfile(e.target.value)}
+                        maxLength={100}
+                      />
+                    </label>
+                    {editMachineError && (
+                      <p role="alert">{editMachineError}</p>
+                    )}
+                    <button type="submit" disabled={savingMachine}>
+                      {savingMachine ? "กำลังบันทึก..." : "บันทึก"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingMachine}
+                      onClick={() => setEditingMachine(null)}
+                    >
+                      ยกเลิก
+                    </button>
+                  </form>
+                )}
                 {machines.map((machine) => (
                   <li key={machine.machine}>
                     {machine.display_name || machine.machine}
@@ -402,6 +503,14 @@ export default function AdminApp() {
                     {machine.machine_type === "wash" ? "เครื่องซัก" : "เครื่องอบ"}
                     {" — "}
                     {machine.status}
+                    {" "}
+                    <button
+                      type="button"
+                      disabled={savingMachine || machine.state !== "IDLE"}
+                      onClick={() => startEditMachine(machine)}
+                    >
+                      แก้ไขข้อมูล
+                    </button>
                     {" — "}
                     {machine.enabled === 1 ? "เปิดให้บริการ" : "ปิดให้บริการ"}
                     {" "}
