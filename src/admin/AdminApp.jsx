@@ -15,6 +15,57 @@ export default function AdminApp() {
   const [machines, setMachines] = useState([]);
   const [machinesError, setMachinesError] = useState("");
   const [machinesLoading, setMachinesLoading] = useState(false);
+  const [updatingMachine, setUpdatingMachine] = useState(null);
+  const [updateMachineError, setUpdateMachineError] = useState("");
+
+  async function handleToggleMachine(machine) {
+    if (!selectedShop || updatingMachine) return;
+
+    const nextEnabled = machine.enabled !== 1;
+
+    if (!nextEnabled && machine.state !== "IDLE") {
+      setUpdateMachineError("ปิดใช้งานได้เฉพาะเครื่องที่ว่าง (IDLE)");
+      return;
+    }
+
+    setUpdatingMachine(machine.machine);
+    setUpdateMachineError("");
+
+    try {
+      const response = await fetch(
+        `${API}/admin/shops/${encodeURIComponent(selectedShop.shop_id)}/machines/${encodeURIComponent(machine.machine)}/enabled`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ enabled: nextEnabled }),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          throw new Error("เครื่องไม่ว่างหรือมีการจองอยู่ ไม่สามารถปิดใช้งานได้");
+        }
+        throw new Error("ไม่สามารถเปลี่ยนสถานะเครื่องได้");
+      }
+
+      const data = await response.json();
+
+      setMachines((previous) =>
+        previous.map((item) =>
+          item.machine === machine.machine
+            ? { ...item, enabled: data.enabled }
+            : item
+        )
+      );
+    } catch (err) {
+      setUpdateMachineError(err.message);
+    } finally {
+      setUpdatingMachine(null);
+    }
+  }
   const [newShopId, setNewShopId] = useState("");
   const [newShopName, setNewShopName] = useState("");
   const [creatingShop, setCreatingShop] = useState(false);
@@ -339,6 +390,11 @@ export default function AdminApp() {
                 )}
               </form>
 
+                {updateMachineError && (
+                  <p role="alert" style={{ color: "red" }}>
+                    {updateMachineError}
+                  </p>
+                )}
                 {machines.map((machine) => (
                   <li key={machine.machine}>
                     {machine.display_name || machine.machine}
@@ -346,6 +402,23 @@ export default function AdminApp() {
                     {machine.machine_type === "wash" ? "เครื่องซัก" : "เครื่องอบ"}
                     {" — "}
                     {machine.status}
+                    {" — "}
+                    {machine.enabled === 1 ? "เปิดให้บริการ" : "ปิดให้บริการ"}
+                    {" "}
+                    <button
+                      type="button"
+                      disabled={
+                        updatingMachine !== null ||
+                        (machine.enabled === 1 && machine.state !== "IDLE")
+                      }
+                      onClick={() => handleToggleMachine(machine)}
+                    >
+                      {updatingMachine === machine.machine
+                        ? "กำลังบันทึก..."
+                        : machine.enabled === 1
+                          ? "ปิดใช้งาน"
+                          : "เปิดใช้งาน"}
+                    </button>
                   </li>
                 ))}
               </ul>
