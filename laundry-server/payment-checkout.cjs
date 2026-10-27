@@ -60,6 +60,10 @@ async function createCheckout(input, {
     );
 
     if (!machine) throw new Error("MACHINE_NOT_FOUND");
+    if (machine.machine_type !== input.type) {
+      throw new Error("MACHINE_TYPE_MISMATCH");
+    }
+    if (machine.enabled !== 1) throw new Error("MACHINE_DISABLED");
     if (machine.status !== "ONLINE") throw new Error("MACHINE_OFFLINE");
 
     const now = Date.now();
@@ -76,12 +80,12 @@ async function createCheckout(input, {
       [input.machine, isTest ? 1 : 0, now]
     );
 
-    const order = await createOrder(db, input, { isTest, shopId: machine.shop_id });
+    const order = await createOrder(db, input, { isTest, shopId: machine.shop_id, machineInfo: machine });
 
     const reserved = await run(
       `UPDATE machines
        SET state = 'RESERVED', reserved_until = ?, reservation_txid = ?
-       WHERE machine = ? AND status = 'ONLINE'
+       WHERE machine = ? AND status = 'ONLINE' AND enabled = 1
          AND state IS ? AND reserved_until IS ?`,
       [order.expiresAt, order.txid, input.machine,
        machine.state, machine.reserved_until]

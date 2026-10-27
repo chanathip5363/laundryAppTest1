@@ -23,7 +23,7 @@ function createAdminRouter(dbPath = "database.db") {
       );
       res.setHeader(
         "Access-Control-Allow-Methods",
-        "GET, POST, OPTIONS"
+        "GET, POST, PATCH, OPTIONS"
       );
     }
 
@@ -250,7 +250,7 @@ function createAdminRouter(dbPath = "database.db") {
   router.get("/shops/:shopId/machines", requireAdmin, (req, res) => {
     db.all(
       `SELECT machine, shop_id, machine_type, model,
-              display_name, program_profile, state, status
+              display_name, program_profile, state, status, enabled
        FROM machines
        WHERE shop_id = ?
        ORDER BY machine`,
@@ -382,6 +382,163 @@ function createAdminRouter(dbPath = "database.db") {
 
       console.error("Machine allocation failed:", err);
       return res.status(500).json({ error: "Machine registration failed" });
+    } finally {
+      await close();
+    }
+  });
+
+
+
+  // Edit machine metadata without changing machine identity or history
+  router.patch("/shops/:shopId/machines/:machine", requireAdmin, async (req, res) => {
+    const { shopId, machine } = req.params;
+    const { display_name, model, program_profile } = req.body || {};
+
+    if (
+      typeof display_name !== "string" ||
+      !display_name.trim() ||
+      display_name.trim().length > 100 ||
+      (model != null && (typeof model !== "string" || model.length > 100)) ||
+      (program_profile != null &&
+        (typeof program_profile !== "string" || program_profile.length > 100))
+    ) {
+      return res.status(400).json({ error: "Invalid machine data" });
+    }
+
+    const writeDb = new sqlite3.Database(dbPath);
+    const run = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.run(sql, params, function(err) {
+        err ? reject(err) : resolve(this);
+      })
+    );
+    const get = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.get(sql, params, (err, row) =>
+        err ? reject(err) : resolve(row)
+      )
+    );
+    const close = () => new Promise(resolve => writeDb.close(() => resolve()));
+
+    let inTransaction = false;
+
+    try {
+      await run("PRAGMA busy_timeout = 10000");
+      await run("BEGIN IMMEDIATE");
+      inTransaction = true;
+
+      const row = await get(
+        `SELECT machine, state, reserved_until
+         FROM machines WHERE machine = ? AND shop_id = ?`,
+        [machine, shopId]
+      );
+
+      if (!row) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(404).json({ error: "Machine not found" });
+      }
+
+      if (row.state !== "IDLE" || (row.reserved_until && row.reserved_until > Date.now())) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(409).json({ error: "Machine is busy" });
+      }
+
+      await run(
+        `UPDATE machines
+         SET display_name = ?, model = ?, program_profile = ?
+         WHERE machine = ? AND shop_id = ?`,
+        [
+          display_name.trim(),
+          model?.trim() || null,
+          program_profile?.trim() || null,
+          machine,
+          shopId
+        ]
+      );
+
+      await run("COMMIT");
+      inTransaction = false;
+
+      return res.json({
+        machine,
+        shop_id: shopId,
+        display_name: display_name.trim(),
+        model: model?.trim() || null,
+        program_profile: program_profile?.trim() || null
+      });
+    } catch (err) {
+      if (inTransaction) {
+        try { await run("ROLLBACK"); } catch (_) {}
+      }
+      console.error("Machine metadata update failed:", err);
+      return res.status(500).json({ error: "Machine update failed" });
+    } finally {
+      await close();
+    }
+  });
+
+  router.patch("/shops/:shopId/machines/:machine/enabled", requireAdmin, async (req, res) => {
+    const { shopId, machine } = req.params;
+    const { enabled } = req.body || {};
+
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "enabled must be boolean" });
+    }
+
+    const writeDb = new sqlite3.Database(dbPath);
+    const run = (sql, params = []) => new Promise((resolve, reject) => {
+      writeDb.run(sql, params, function (err) {
+        if (err) reject(err);
+        else resolve(this);
+      });
+    });
+    const get = (sql, params = []) => new Promise((resolve, reject) => {
+      writeDb.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+    });
+    const close = () => new Promise(resolve => writeDb.close(() => resolve()));
+
+    let inTransaction = false;
+
+    try {
+      await run("PRAGMA busy_timeout = 10000");
+      await run("BEGIN IMMEDIATE");
+      inTransaction = true;
+
+      const row = await get(
+        "SELECT machine, state, reserved_until, enabled FROM machines WHERE machine = ? AND shop_id = ?",
+        [machine, shopId]
+      );
+
+      if (!row) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(404).json({ error: "Machine not found" });
+      }
+
+      if (!enabled && (
+        row.state !== "IDLE" ||
+        (row.reserved_until != null && row.reserved_until > Date.now())
+      )) {
+        await run("ROLLBACK");
+        inTransaction = false;
+        return res.status(409).json({ error: "Machine is not idle" });
+      }
+
+      await run(
+        "UPDATE machines SET enabled = ? WHERE machine = ? AND shop_id = ?",
+        [enabled ? 1 : 0, machine, shopId]
+      );
+
+      await run("COMMIT");
+      inTransaction = false;
+
+      return res.json({ machine, shop_id: shopId, enabled: enabled ? 1 : 0 });
+    } catch (err) {
+      if (inTransaction) {
+        try { await run("ROLLBACK"); } catch (_) {}
+      }
+      console.error("Admin machine enabled update failed:", err);
+      return res.status(500).json({ error: "Machine update failed" });
     } finally {
       await close();
     }

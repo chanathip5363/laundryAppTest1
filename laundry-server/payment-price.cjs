@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-function quotePrice(input) {
+function quotePrice(input, pricingOverride = null) {
   const pricing = JSON.parse(fs.readFileSync(
     path.join(__dirname, "../shared/payment-pricing.json"),
     "utf8"
@@ -24,11 +24,16 @@ function quotePrice(input) {
   }
 
   const machines = pricing[type];
-  if (!machines || !Object.hasOwn(machines, machine)) {
+  if (
+    pricingOverride === null &&
+    (!machines || !Object.hasOwn(machines, machine))
+  ) {
     throw new Error("ไม่พบเครื่องในบริการนี้");
   }
 
-  const config = machines[machine];
+  const config = pricingOverride === null
+    ? machines[machine]
+    : pricingOverride;
   const groups = Object.entries(config.priceGroups).filter(
     ([, programs]) => programs.includes(program)
   );

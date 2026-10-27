@@ -350,14 +350,16 @@ app.post("/request-qr", (req, res) => {
       });
 }    
 
+    if (row.enabled !== 1) {
+      return res.json({
+        success: false,
+        message: "เครื่องนี้ปิดให้บริการชั่วคราว"
+      });
+    }
+
     if (row && (row.state === "RUNNING" || row.state === "STARTING")) {
       return res.json({ success: false, message: "เครื่องกำลังทำงาน" });
     }    
-
-    // ปลด lock ถ้าหมดเวลาแล้ว
-    if (row && row.state === "RESERVED" && row.reserved_until <= now) {
-      db.run(`UPDATE machines SET state = 'IDLE', reserved_until = NULL WHERE machine = ?`, [machine]);
-    }
 
     if (row && row.status !== "ONLINE") {
       return res.json({ success: false, message: "เครื่องออฟไลน์" });
@@ -369,25 +371,41 @@ app.post("/request-qr", (req, res) => {
 
     const reservedUntil = now + 120000; // 2 นาที
 
-if (row) {
-  db.run(`
-    UPDATE machines
-    SET state = 'RESERVED', reserved_until = ?
-    WHERE machine = ?
-  `, [reservedUntil, machine]);
-} else {
-  db.run(`
-    INSERT INTO machines (machine, state, reserved_until)
-    VALUES (?, 'RESERVED', ?)
-  `, [machine, reservedUntil]);
-}
+    db.run(
+      `UPDATE machines
+       SET state = 'RESERVED', reserved_until = ?
+       WHERE machine = ?
+         AND enabled = 1
+         AND status = 'ONLINE'
+         AND (
+           state = 'IDLE'
+           OR (state = 'RESERVED' AND reserved_until <= ?)
+         )`,
+      [reservedUntil, machine, now],
+      function(err) {
+        if (err) {
+          console.error("[REQUEST QR] reservation failed:", err);
+          return res.status(500).json({
+            success: false,
+            message: "จองเครื่องไม่สำเร็จ"
+          });
+        }
 
-  return res.json({
-    success: true,
-    message: "จองเครื่องสำเร็จ",
-    qr: "TEMP_QR",
-    reservedUntil: reservedUntil
-  });
+        if (this.changes !== 1) {
+          return res.json({
+            success: false,
+            message: "เครื่องไม่ว่างหรือปิดให้บริการ"
+          });
+        }
+
+        return res.json({
+          success: true,
+          message: "จองเครื่องสำเร็จ",
+          qr: "TEMP_QR",
+          reservedUntil
+        });
+      }
+    );
 
   });
 });
@@ -786,7 +804,7 @@ app.get("/shops/:shopId/machines", (req, res) => {
         `SELECT machine, shop_id, machine_type, model,
                 display_name, program_profile, state, status, reserved_until
          FROM machines
-         WHERE shop_id = ?
+         WHERE shop_id = ? AND enabled = 1
          ORDER BY machine`,
         [shopId],
         (err, rows) => {

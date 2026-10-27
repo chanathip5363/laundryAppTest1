@@ -19,6 +19,11 @@ function selection(input) {
       if (!Number.isSafeInteger(input[key]) || input[key] < 0) throw new Error('INVALID_SELECTION');
       command[key] = input[key];
     }
+    if (input.tempOption !== null && input.tempOption !== undefined &&
+        typeof input.tempOption !== 'string') throw new Error('INVALID_SELECTION');
+    if (typeof input.aromaOption !== 'boolean') throw new Error('INVALID_SELECTION');
+    command.tempOption = input.tempOption ?? null;
+    command.aromaOption = input.aromaOption;
   } else {
     if (input.temperatureOption !== null && typeof input.temperatureOption !== 'string') throw new Error('INVALID_SELECTION');
     if (typeof input.wrinkleOption !== 'boolean') throw new Error('INVALID_SELECTION');
@@ -28,16 +33,26 @@ function selection(input) {
   return { command, amountSatang };
 }
 
-async function saveSelectedOrder(db, input, { isTest = false, shopId } = {}) {
+async function saveSelectedOrder(db, input, { isTest = false, shopId, machineInfo } = {}) {
   const { command, amountSatang } = selection(input);
+  const { quoteShopPrice } = require('./payment-shop-price.cjs');
+  const quote = await quoteShopPrice(db, command, machineInfo);
+  if (quote.amountSatang !== amountSatang) throw new Error('PAYMENT_AMOUNT_MISMATCH');
   await initializeReceipts(db);
   await require('./payment-discount.cjs').assertBaseAmountAvailable(db, amountSatang, isTest);
   const txid = 'TX' + randomUUID().replace(/-/g, '');
   const createdAt = Date.now();
   const expiresAt = createdAt + 120000;
-  // Save the existing React result; do not introduce a second price or pulse table.
+  // Save the verified server price and its pricing source.
   const options = { command };
-  const snapshot = { source: 'existing-react', amount: command.amount, amountSatang };
+  const snapshot = {
+    source: quote.pricingSource,
+    basePrice: quote.basePrice,
+    temperaturePrice: quote.temperaturePrice,
+    extraPrice: quote.extraPrice,
+    amount: quote.amount,
+    amountSatang: quote.amountSatang
+  };
   await new Promise((resolve, reject) => {
     db.run(`INSERT INTO payment_orders
       (txid,machine,service,program,options_json,amount_satang,price_snapshot_json,created_at,expires_at,status,is_test,shop_id)
@@ -52,6 +67,81 @@ async function saveSelectedOrder(db, input, { isTest = false, shopId } = {}) {
 
 function createSessionRouter({ dbPath = path.join(__dirname, 'database.db'), isTest = false } = {}) {
   const router = express.Router();
+
+  router.get('/pricing/:machine', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+
+    try {
+      const machineId = req.params.machine;
+
+      if (!/^machine\d+$/.test(machineId)) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_MACHINE',
+          message: 'รหัสเครื่องไม่ถูกต้อง'
+        });
+      }
+
+      const { getPricingCatalog } = require('./payment-pricing-catalog.cjs');
+      const catalog = await getPricingCatalog(machineId, { dbPath });
+
+      res.json({ success: true, ...catalog });
+    } catch (err) {
+      const known = {
+        MACHINE_NOT_FOUND: [404, 'ไม่พบเครื่อง'],
+        PRICING_NOT_FOUND: [404, 'ไม่พบตารางราคาของเครื่อง']
+      };
+
+      const matched = Object.hasOwn(known, err.message);
+      if (!matched) console.error('[PAYMENT PRICING]', err.message);
+
+      const [status, message] = matched
+        ? known[err.message]
+        : [500, 'ไม่สามารถอ่านตารางราคาได้'];
+
+      res.status(status).json({
+        success: false,
+        code: matched ? err.message : 'PRICING_FAILED',
+        message
+      });
+    }
+  });
+
+  router.post('/quote', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const input = req.body;
+      if (!input || typeof input !== 'object' || Array.isArray(input) ||
+          typeof input.machine !== 'string' || !/^machine\d+$/.test(input.machine) ||
+          !['wash', 'dry'].includes(input.type) ||
+          !Number.isSafeInteger(input.program) || input.program < 1) {
+        return res.status(400).json({
+          success: false, code: 'INVALID_SELECTION',
+          message: 'ข้อมูลเครื่องหรือโปรแกรมไม่ถูกต้อง'
+        });
+      }
+
+      const { getPaymentQuote } = require('./payment-quote.cjs');
+      const quote = await getPaymentQuote(input, { dbPath });
+      res.json({ success: true, ...quote });
+    } catch (err) {
+      const errors = {
+        MACHINE_NOT_FOUND: [404, 'ไม่พบเครื่อง'],
+        MACHINE_INFO_MISMATCH: [409, 'ประเภทบริการไม่ตรงกับเครื่องที่เลือก']
+      };
+      const known = Object.hasOwn(errors, err.message);
+      if (!known) console.error('[PAYMENT QUOTE]', err.message);
+      const [status, message] = known
+        ? errors[err.message]
+        : [400, 'ไม่สามารถคำนวณราคาจากตัวเลือกนี้ได้'];
+      res.status(status).json({
+        success: false,
+        code: known ? err.message : 'QUOTE_FAILED',
+        message
+      });
+    }
+  });
+
   router.post('/session', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     try {
@@ -61,9 +151,12 @@ function createSessionRouter({ dbPath = path.join(__dirname, 'database.db'), isT
     } catch (err) {
       const errors = {
         INVALID_SELECTION: [400, 'ข้อมูลรายการชำระไม่ถูกต้อง'],
+        PAYMENT_AMOUNT_MISMATCH: [409, 'ยอดชำระไม่ตรงกับราคาที่กำหนด กรุณาทำรายการใหม่'],
         PAYMENT_AMOUNT_RESERVED: [409, 'ยอดนี้อยู่ระหว่างจองส่วนลด กรุณารอสักครู่แล้วลองใหม่'],
         MACHINE_NOT_FOUND: [404, 'ไม่พบเครื่อง'],
+        MACHINE_TYPE_MISMATCH: [409, 'ประเภทบริการไม่ตรงกับเครื่องที่เลือก'],
         MACHINE_OFFLINE: [409, 'เครื่องออฟไลน์'],
+        MACHINE_DISABLED: [409, 'เครื่องนี้ปิดให้บริการชั่วคราว'],
         MACHINE_BUSY: [409, 'เครื่องไม่ว่าง'],
         RESERVATION_FAILED: [409, 'จองเครื่องไม่สำเร็จ กรุณาลองใหม่']
       };
@@ -104,6 +197,7 @@ function authorizeWebhook(db, client, { isTest = false } = {}) {
       }
       const machine = await get('SELECT * FROM machines WHERE machine=?', [order.machine]);
       if (!machine || machine.status !== 'ONLINE') return deny(409, 'MACHINE_OFFLINE', 'เครื่องออฟไลน์');
+      if (machine.enabled !== 1) return deny(409, 'MACHINE_DISABLED', 'เครื่องนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแล');
       if (machine.state !== 'RESERVED' || machine.reservation_txid !== txid ||
           !machine.reserved_until || machine.reserved_until <= Date.now() || order.expires_at <= Date.now()) {
         return deny(409, 'RESERVATION_INVALID', 'การจองเครื่องหมดเวลาหรือไม่ตรงกับรายการ กรุณาติดต่อผู้ดูแล');
