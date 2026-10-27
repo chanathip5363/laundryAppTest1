@@ -21,7 +21,6 @@ export default function AdminApp() {
   const [createShopError, setCreateShopError] = useState("");
   const [createShopSuccess, setCreateShopSuccess] = useState("");
 
-  const [newMachineId, setNewMachineId] = useState("");
   const [newMachineType, setNewMachineType] = useState("wash");
   const [newMachineModel, setNewMachineModel] = useState("");
   const [newMachineName, setNewMachineName] = useState("");
@@ -131,7 +130,6 @@ export default function AdminApp() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            machine: newMachineId.trim(),
             machine_type: newMachineType,
             model: newMachineModel.trim() || null,
             display_name: newMachineName.trim(),
@@ -155,11 +153,10 @@ export default function AdminApp() {
 
       const data = await response.json();
       setMachines((previous) => [...previous, data.machine]);
-      setNewMachineId("");
       setNewMachineModel("");
       setNewMachineName("");
       setNewMachineProfile("");
-      setCreateMachineSuccess("ลงทะเบียนเครื่องใหม่สำเร็จ");
+      setCreateMachineSuccess(`ลงทะเบียนเครื่อง ${data.machine.machine} สำเร็จ`);
     } catch (err) {
       setCreateMachineError(err.message);
     } finally {
@@ -288,16 +285,7 @@ export default function AdminApp() {
               <ul>
               <h4>ลงทะเบียนเครื่องใหม่</h4>
               <form onSubmit={handleCreateMachine}>
-                <label htmlFor="new-machine-id">รหัสเครื่อง</label>
-                <input
-                  id="new-machine-id"
-                  value={newMachineId}
-                  onChange={(e) => setNewMachineId(e.target.value)}
-                  placeholder="เช่น machine9"
-                  pattern="machine[0-9]+"
-                  required
-                  style={{ display: "block", width: "100%", marginBottom: 12 }}
-                />
+                <p>ระบบจะสร้างรหัสเครื่องให้อัตโนมัติ</p>
 
                 <label htmlFor="new-machine-type">ประเภทเครื่อง</label>
                 <select
