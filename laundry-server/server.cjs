@@ -5,9 +5,12 @@ const sqlite3 = require("sqlite3").verbose();
 
 const cors = require("cors")
 
+const { createAdminRouter } = require("./admin-router.cjs");
+
 const app = express();
-app.use(cors());
+app.use((req, res, next) => req.path.startsWith("/admin/") ? next() : cors()(req, res, next));
 app.use(express.json());
+app.use("/admin", createAdminRouter());
 
 const usedTx = new Set();
 app.use(bodyParser.json());
