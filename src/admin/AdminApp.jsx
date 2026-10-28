@@ -83,6 +83,13 @@ export default function AdminApp() {
     setPricingSuccess("");
     setPricingSaving(true);
     try {
+      const priceKeys = Object.keys(pricingDraft.priceGroups);
+      if (!priceKeys.length || priceKeys.some(price =>
+        !/^\d+(?:\.\d{1,2})?$/.test(price) ||
+        Number(price) <= 0 || Number(price) > 100000
+      ) || new Set(priceKeys.map(Number)).size !== priceKeys.length) {
+        throw new Error("ราคากลุ่มไม่ถูกต้องหรือมีราคาซ้ำกัน");
+      }
       const groups = Object.fromEntries(Object.entries(pricingDraft.priceGroups).map(([price, ids]) => [
         price, typeof ids === "string" ? parseProgramIds(ids) : ids
       ]));
@@ -767,7 +774,27 @@ export default function AdminApp() {
                       <h4>กลุ่มราคาและโปรแกรมที่เปิดให้บริการ</h4>
                       {Object.entries(pricingDraft.priceGroups).map(([price, programs]) => (
                         <div key={price} style={{ marginBottom: 12 }}>
-                          <label>ราคา {price} บาท — หมายเลขโปรแกรม (คั่นด้วย ,)
+                          <label style={{ display: "block", marginBottom: 6 }}>
+                            ราคากลุ่ม (บาท){" "}
+                            <input type="number" min="0.01" max="100000" step="0.01" required
+                              style={{ width: 110 }}
+                              value={price}
+                              onChange={event => {
+                                const nextPrice = event.target.value;
+                                if (!/^\d+(?:\.\d{0,2})?$/.test(nextPrice)) return;
+                                if (nextPrice !== price && Object.hasOwn(pricingDraft.priceGroups, nextPrice)) {
+                                  setPricingError("มีกลุ่มราคานี้อยู่แล้ว");
+                                  return;
+                                }
+                                const next = {};
+                                for (const [key, value] of Object.entries(pricingDraft.priceGroups)) {
+                                  next[key === price ? nextPrice : key] = value;
+                                }
+                                setPricingError("");
+                                updatePricingField("priceGroups", next);
+                              }} />
+                          </label>
+                          <label>หมายเลขโปรแกรม (คั่นด้วย ,)
                             <input style={{ display: "block", width: "100%" }}
                               value={Array.isArray(programs) ? programs.join(", ") : programs}
                               onChange={event => updatePricingField("priceGroups", {
