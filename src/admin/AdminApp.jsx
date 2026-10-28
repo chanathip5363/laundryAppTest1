@@ -23,6 +23,114 @@ export default function AdminApp() {
   const [savingMachine, setSavingMachine] = useState(false);
   const [editMachineError, setEditMachineError] = useState("");
 
+  const [pricingMachine, setPricingMachine] = useState(null);
+  const [pricingDraft, setPricingDraft] = useState(null);
+  const [pricingSource, setPricingSource] = useState("");
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingError, setPricingError] = useState("");
+  const [pricingSuccess, setPricingSuccess] = useState("");
+
+  function updatePricingField(field, value) {
+    setPricingDraft(previous => ({ ...previous, [field]: value }));
+    setPricingSuccess("");
+  }
+
+  function parseProgramIds(text) {
+    const values = text.split(/[,\s]+/).filter(Boolean);
+    if (!values.length || values.some(value => !/^\d+$/.test(value) || Number(value) < 1)) {
+      throw new Error("กรุณาระบุหมายเลขโปรแกรมเป็นจำนวนเต็มบวก คั่นด้วยเครื่องหมายจุลภาค");
+    }
+    return values.map(Number);
+  }
+
+  async function openPricing(machine) {
+    if (!selectedShop || pricingLoading) return;
+    setPricingMachine(machine);
+    setPricingDraft(null);
+    setPricingError("");
+    setPricingSuccess("");
+    setPricingLoading(true);
+    try {
+      const response = await fetch(
+        `${API}/admin/shops/${encodeURIComponent(selectedShop.shop_id)}/machines/${encodeURIComponent(machine.machine)}/pricing`,
+        { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+      );
+      if (!response.ok) throw new Error(response.status === 404
+        ? "ไม่พบข้อมูลเครื่องหรือ API ราคายังไม่ได้ติดตั้งบน Server"
+        : "ไม่สามารถโหลดราคาได้ (HTTP " + response.status + ")");
+      const data = await response.json();
+      const fields = machine.machine_type === "wash"
+        ? ["priceGroups", "temperaturePrice", "aromaPrice"]
+        : ["priceGroups", "temperatureRule", "wrinklePrice"];
+      const draft = Object.fromEntries(fields.map(key => [key, data[key]]));
+      if (fields.some(key => draft[key] === undefined)) {
+        throw new Error("ข้อมูลราคาไม่ครบ ไม่สามารถแก้ไขได้");
+      }
+      setPricingDraft(draft);
+      setPricingSource(data.pricingSource || "");
+    } catch (err) {
+      setPricingError(err.message);
+    } finally {
+      setPricingLoading(false);
+    }
+  }
+
+  async function savePricing(event) {
+    event.preventDefault();
+    if (!selectedShop || !pricingMachine || !pricingDraft || pricingSaving) return;
+    setPricingError("");
+    setPricingSuccess("");
+    setPricingSaving(true);
+    try {
+      const groups = Object.fromEntries(Object.entries(pricingDraft.priceGroups).map(([price, ids]) => [
+        price, typeof ids === "string" ? parseProgramIds(ids) : ids
+      ]));
+      const allIds = Object.values(groups).flat();
+      if (new Set(allIds).size !== allIds.length) {
+        throw new Error("หมายเลขโปรแกรมซ้ำกันระหว่างกลุ่มราคา");
+      }
+      const pricing = { ...pricingDraft, priceGroups: groups };
+      if (pricingMachine.machine_type === "dry") {
+        pricing.temperatureRule = {
+          ...pricing.temperatureRule,
+          programs: typeof pricing.temperatureRule.programs === "string"
+            ? parseProgramIds(pricing.temperatureRule.programs)
+            : pricing.temperatureRule.programs
+        };
+      }
+      const response = await fetch(
+        `${API}/admin/shops/${encodeURIComponent(selectedShop.shop_id)}/machines/${encodeURIComponent(pricingMachine.machine)}/pricing`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ pricing })
+        }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `บันทึกไม่สำเร็จ (HTTP ${response.status})`);
+      setPricingDraft(pricing);
+      setPricingSource("machine");
+      setPricingSuccess("บันทึกราคาเรียบร้อยแล้ว");
+    } catch (err) {
+      setPricingError(err.message);
+    } finally {
+      setPricingSaving(false);
+    }
+  }
+
+  function priceNumberInput(value, onChange, label) {
+    return (
+      <label style={{ display: "block", marginBottom: 8 }}>
+        {label} (บาท){" "}
+        <input type="number" min="0" max="100000" step="0.01" required
+          value={value ?? ""}
+          onChange={event => onChange(event.target.value === "" ? "" : Number(event.target.value))}
+          style={{ width: 100 }} />
+      </label>
+    );
+  }
+
   function startEditMachine(machine) {
     setEditingMachine(machine.machine);
     setEditMachineName(machine.display_name || "");
@@ -346,6 +454,8 @@ export default function AdminApp() {
   async function handleSelectShop(shop) {
     setCreateMachineError("");
     setCreateMachineSuccess("");
+    setPricingMachine(null);
+    setPricingDraft(null);
     setSelectedShop(shop);
     setMachines([]);
     setMachinesError("");
@@ -376,6 +486,8 @@ export default function AdminApp() {
     setUser(null);
     setShops([]);
     setShopsError("");
+    setPricingMachine(null);
+    setPricingDraft(null);
     setSelectedShop(null);
     setMachines([]);
     setMachinesError("");
@@ -596,6 +708,14 @@ export default function AdminApp() {
                       แก้ไขข้อมูล
                     </button>
                     {" — "}
+                     {machine.deleted_at == null && (
+                       <>
+                         {" "}
+                         <button type="button" onClick={() => openPricing(machine)}>
+                           จัดการราคา
+                         </button>
+                       </>
+                     )}
                     {machine.deleted_at != null
                       ? "ลบแล้ว: " + new Date(machine.deleted_at).toLocaleString("th-TH")
                       : machine.enabled === 1 ? "เปิดให้บริการ" : "ปิดให้บริการ"}
@@ -634,7 +754,95 @@ export default function AdminApp() {
                   </li>
                 ))}
               </ul>
-            </section>
+              {pricingMachine && (
+                <section style={{ border: "1px solid #bbb", borderRadius: 8, padding: 16, marginTop: 18 }}>
+                  <h4>จัดการราคา: {pricingMachine.display_name || pricingMachine.machine}</h4>
+                  <p>เครื่อง {pricingMachine.machine} — {pricingMachine.machine_type === "wash" ? "ซัก" : "อบ"}</p>
+                  {pricingLoading && <p>กำลังโหลดราคา...</p>}
+                  {pricingError && <p role="alert" style={{ color: "red" }}>{pricingError}</p>}
+                  {pricingSuccess && <p role="status" style={{ color: "green" }}>{pricingSuccess}</p>}
+                  {pricingDraft && (
+                    <form onSubmit={savePricing}>
+                      <p>แหล่งราคา: {pricingSource || "ไม่ระบุ"} (เมื่อบันทึกจะเป็นราคาเฉพาะเครื่องนี้)</p>
+                      <h4>กลุ่มราคาและโปรแกรมที่เปิดให้บริการ</h4>
+                      {Object.entries(pricingDraft.priceGroups).map(([price, programs]) => (
+                        <div key={price} style={{ marginBottom: 12 }}>
+                          <label>ราคา {price} บาท — หมายเลขโปรแกรม (คั่นด้วย ,)
+                            <input style={{ display: "block", width: "100%" }}
+                              value={Array.isArray(programs) ? programs.join(", ") : programs}
+                              onChange={event => updatePricingField("priceGroups", {
+                                ...pricingDraft.priceGroups, [price]: event.target.value
+                              })} />
+                          </label>
+                          <button type="button" onClick={() => {
+                            const next = { ...pricingDraft.priceGroups };
+                            delete next[price];
+                            updatePricingField("priceGroups", next);
+                          }}>ลบกลุ่มนี้</button>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => {
+                        const price = window.prompt("ราคาเริ่มต้นของกลุ่มใหม่ (บาท)");
+                        if (price === null) return;
+                        const amount = Number(price);
+                        if (!/^\d+(?:\.\d{1,2})?$/.test(price) || amount <= 0 ||
+                            Object.hasOwn(pricingDraft.priceGroups, String(amount))) {
+                          setPricingError("ราคาไม่ถูกต้องหรือมีกลุ่มราคานี้แล้ว");
+                          return;
+                        }
+                        setPricingError("");
+                        updatePricingField("priceGroups", {
+                          ...pricingDraft.priceGroups, [String(amount)]: ""
+                        });
+                      }}>+ เพิ่มกลุ่มราคา</button>
+                      {pricingMachine.machine_type === "wash" ? (
+                        <>
+                          <h4>ค่าอุณหภูมิซักเพิ่มเติม</h4>
+                          {Object.entries(pricingDraft.temperaturePrice).map(([temp, value]) => (
+                            <div key={temp}>{priceNumberInput(value, next => updatePricingField("temperaturePrice", {
+                              ...pricingDraft.temperaturePrice, [temp]: next
+                            }), `${temp}°C`)}</div>
+                          ))}
+                          <h4>ค่าน้ำหอม</h4>
+                          {priceNumberInput(pricingDraft.aromaPrice, next => updatePricingField("aromaPrice", next), "น้ำหอม")}
+                        </>
+                      ) : (
+                        <>
+                          <h4>ค่าอุณหภูมิอบเพิ่มเติม</h4>
+                          {Object.entries(pricingDraft.temperatureRule.prices).map(([option, value]) => (
+                            <div key={option}>{priceNumberInput(value, next => updatePricingField("temperatureRule", {
+                              ...pricingDraft.temperatureRule,
+                              prices: { ...pricingDraft.temperatureRule.prices, [option]: next }
+                            }), option)}</div>
+                          ))}
+                          <label>โปรแกรมที่ใช้ค่าอุณหภูมิเพิ่มเติม (คั่นด้วย ,)
+                            <input style={{ display: "block", width: "100%" }}
+                              value={Array.isArray(pricingDraft.temperatureRule.programs)
+                                ? pricingDraft.temperatureRule.programs.join(", ")
+                                : pricingDraft.temperatureRule.programs}
+                              onChange={event => updatePricingField("temperatureRule", {
+                                ...pricingDraft.temperatureRule, programs: event.target.value
+                              })} />
+                          </label>
+                          <h4>ค่าป้องกันผ้ายับ</h4>
+                          {priceNumberInput(pricingDraft.wrinklePrice, next => updatePricingField("wrinklePrice", next), "ป้องกันผ้ายับ")}
+                        </>
+                      )}
+                      <p style={{ fontSize: 13 }}>หมายเลขโปรแกรมต้องตรงกับโปรแกรมที่เครื่องรองรับ การลบหมายเลขออกจากกลุ่มราคาจะทำให้ไม่สามารถซื้อโปรแกรมนั้นได้</p>
+                      <button type="submit" disabled={pricingSaving}>
+                        {pricingSaving ? "กำลังบันทึก..." : "บันทึกราคา"}
+                      </button>{" "}
+                      <button type="button" disabled={pricingSaving} onClick={() => {
+                        setPricingMachine(null); setPricingDraft(null); setPricingError("");
+                      }}>ปิด</button>
+                    </form>
+                  )}
+                  {!pricingDraft && !pricingLoading && (
+                    <button type="button" onClick={() => { setPricingMachine(null); setPricingError(""); }}>ปิด</button>
+                  )}
+                </section>
+              )}
+             </section>
           )}
 
           <button onClick={handleLogout}>ออกจากระบบ</button>

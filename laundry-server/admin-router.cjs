@@ -627,6 +627,124 @@ function createAdminRouter(dbPath = "database.db") {
     }
   });
 
+
+  // Shop-specific pricing: read the effective catalog for a machine.
+  router.get("/shops/:shopId/machines/:machine/pricing", requireAdmin, async (req, res) => {
+    const { shopId, machine } = req.params;
+    if (!/^machine\d+$/.test(machine)) {
+      return res.status(400).json({ error: "Invalid machine" });
+    }
+    db.get(
+      `SELECT machine FROM machines WHERE machine = ? AND shop_id = ? AND deleted_at IS NULL`,
+      [machine, shopId],
+      async (err, row) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+        if (!row) return res.status(404).json({ error: "Machine not found in shop" });
+        try {
+          const { getPricingCatalog } = require("./payment-pricing-catalog.cjs");
+          const catalog = await getPricingCatalog(machine, { dbPath });
+          res.set("Cache-Control", "no-store");
+          return res.json({ success: true, shop_id: shopId, ...catalog });
+        } catch (error) {
+          console.error("Admin pricing read failed:", error);
+          return res.status(500).json({ error: "Pricing read failed" });
+        }
+      }
+    );
+  });
+
+
+  // Save machine-specific pricing without changing the firmware program IDs.
+  router.patch("/shops/:shopId/machines/:machine/pricing", requireAdmin, async (req, res) => {
+    const { shopId, machine } = req.params;
+    const pricing = req.body?.pricing;
+    if (!/^machine\d+$/.test(machine) || !pricing || typeof pricing !== "object" || Array.isArray(pricing)) {
+      return res.status(400).json({ error: "Invalid machine or pricing" });
+    }
+
+    const validMoney = (v, positive = false) =>
+      typeof v === "number" && Number.isFinite(v) &&
+      (positive ? v > 0 : v >= 0) && v <= 100000 &&
+      Number.isSafeInteger(Math.round(v * 100)) &&
+      Math.abs(v * 100 - Math.round(v * 100)) < 1e-7;
+    const validPrices = (obj) => obj && typeof obj === "object" &&
+      !Array.isArray(obj) && Object.values(obj).every(v => validMoney(v));
+    const groups = pricing.priceGroups;
+    if (!groups || typeof groups !== "object" || Array.isArray(groups) ||
+        !Object.keys(groups).length || Object.entries(groups).some(([price, programs]) =>
+          !/^\d+(?:\.\d{1,2})?$/.test(price) || !validMoney(Number(price), true) ||
+          !Array.isArray(programs) || !programs.length ||
+          programs.some(id => !Number.isSafeInteger(id) || id <= 0))) {
+      return res.status(400).json({ error: "Invalid price groups" });
+    }
+    const programIds = Object.values(groups).flat();
+    if (new Set(programIds).size !== programIds.length) {
+      return res.status(400).json({ error: "Program appears in more than one price group" });
+    }
+
+    const writeDb = new sqlite3.Database(dbPath);
+    const get = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.get(sql, params, (err, row) => err ? reject(err) : resolve(row)));
+    const run = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.run(sql, params, function (err) { err ? reject(err) : resolve(this); }));
+    let started = false;
+    try {
+      await run("PRAGMA busy_timeout = 10000");
+      await run("BEGIN IMMEDIATE");
+      started = true;
+      const row = await get(
+        `SELECT machine_type, program_profile FROM machines
+         WHERE machine = ? AND shop_id = ? AND deleted_at IS NULL`,
+        [machine, shopId]
+      );
+      if (!row) {
+        await run("ROLLBACK"); started = false;
+        return res.status(404).json({ error: "Machine not found in shop" });
+      }
+      if (!row.program_profile) {
+        await run("ROLLBACK"); started = false;
+        return res.status(409).json({ error: "Machine has no program profile" });
+      }
+      const type = row.machine_type;
+      const allowed = type === "wash"
+        ? ["priceGroups", "temperaturePrice", "aromaPrice"]
+        : ["priceGroups", "temperatureRule", "wrinklePrice"];
+      if (!allowed.every(k => Object.hasOwn(pricing, k)) ||
+          Object.keys(pricing).some(k => !allowed.includes(k)) ||
+          (type === "wash" && (!validPrices(pricing.temperaturePrice) || !validMoney(pricing.aromaPrice))) ||
+          (type === "dry" && (!pricing.temperatureRule ||
+            !Array.isArray(pricing.temperatureRule.programs) ||
+            new Set(pricing.temperatureRule.programs).size !== pricing.temperatureRule.programs.length ||
+            pricing.temperatureRule.programs.some(id => !programIds.includes(id)) ||
+            !validPrices(pricing.temperatureRule.prices) ||
+            !validMoney(pricing.wrinklePrice))) ||
+          !["wash", "dry"].includes(type)) {
+        await run("ROLLBACK"); started = false;
+        return res.status(400).json({ error: "Invalid pricing structure for machine type" });
+      }
+      await run(
+        `INSERT INTO shop_machine_pricing
+           (shop_id, machine, program_profile, pricing_json, updated_at)
+         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(machine) WHERE machine IS NOT NULL DO UPDATE SET
+           shop_id = excluded.shop_id,
+           program_profile = excluded.program_profile,
+           pricing_json = excluded.pricing_json,
+           updated_at = CURRENT_TIMESTAMP`,
+        [shopId, machine, row.program_profile, JSON.stringify(pricing)]
+      );
+      await run("COMMIT"); started = false;
+      res.set("Cache-Control", "no-store");
+      return res.json({ success: true, shop_id: shopId, machine, pricingSource: "machine", pricing });
+    } catch (error) {
+      if (started) { try { await run("ROLLBACK"); } catch (_) {} }
+      console.error("Admin pricing save failed:", error);
+      return res.status(500).json({ error: "Pricing save failed" });
+    } finally {
+      await new Promise(resolve => writeDb.close(() => resolve()));
+    }
+  });
+
   return router;
 }
 
