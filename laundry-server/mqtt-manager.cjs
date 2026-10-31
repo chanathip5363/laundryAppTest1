@@ -20,9 +20,6 @@ function validateCommand(command) {
   if (!command || typeof command !== "object" || Array.isArray(command)) {
     throw new Error("Invalid command");
   }
-  if (command.type === "finish") {
-  return { type: "finish" };
-  }
   if (typeof command.txid !== "string" || !command.txid.trim()) {
     throw new Error("Missing txid");
   }
