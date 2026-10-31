@@ -570,14 +570,16 @@ const beginPayment = async () => {
 const finishWash = (machine) => {
   if (!client) return;
 
-  client.publish(`laundry/${machine}/finish`, "done");
+  const shopId = "shop001";
+  const topic = `laundry/${shopId}/${machine}/finish`;
 
-  console.log("Finish pressed:", machine);
+  client.publish(topic, "done");
+
+  console.log("Finish pressed:", topic);
 
   setStep(1);
   setMode(null);
 };
-
 
 
 
