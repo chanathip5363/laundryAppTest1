@@ -567,18 +567,25 @@ const beginPayment = async () => {
     return data;
   };
 
-const finishWash = (machine) => {
-  if (!client) return;
+const finishWash = async (machine) => {
+  try {
+    const response = await fetch(
+      `https://api.the-oasis-living.com/machines/${machine}/finish`,
+      { method: "POST" }
+    );
 
-  const shopId = "shop001";
-  const topic = `laundry/${shopId}/${machine}/finish`;
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
 
-  client.publish(topic, "done");
+    console.log("Finish sent:", machine);
 
-  console.log("Finish pressed:", topic);
-
-  setStep(1);
-  setMode(null);
+    setStep(1);
+    setMode(null);
+  } catch (error) {
+    console.error("Finish failed:", error);
+    alert("ส่งคำสั่งซักเสร็จไม่สำเร็จ");
+  }
 };
 
 
