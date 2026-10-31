@@ -20,9 +20,6 @@ function validateCommand(command) {
   if (!command || typeof command !== "object" || Array.isArray(command)) {
     throw new Error("Invalid command");
   }
-  if (command.type === "finish") {
-  return { type: "finish" };
-  }
   if (typeof command.txid !== "string" || !command.txid.trim()) {
     throw new Error("Missing txid");
   }
@@ -84,9 +81,9 @@ function createMqttManager({
     });
     client.on("error", err => console.error("[MQTT NEW]", err.message));
     client.on("connect", () => {
-      // Multi-shop subscription: broker ACL must authorize laundry/+/+/+.
+      // Pilot machine only: avoid wildcard subscriptions until shop ACLs are provisioned.
       for (const type of ["state", "status", "telemetry"]) {
-        const topic = `laundry/+/+/${type}`;
+        const topic = `laundry/shop001/machine1/${type}`;
         client.subscribe(topic, { qos: 1 }, (err, granted) => {
           if (err || !granted?.some(item => item.qos !== 128)) {
             console.error("[MQTT NEW] Subscribe failed:", topic, err?.message || "Not authorized");

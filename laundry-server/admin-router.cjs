@@ -5,7 +5,7 @@ const { verifyPassword } = require("./admin-auth.cjs");
 
 const SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
-function createAdminRouter(dbPath = "database.db", { publishFinish } = {}) {
+function createAdminRouter(dbPath = "database.db") {
   const router = express.Router();
   const allowedOrigins = new Set([
     "https://laundry-app-test1.vercel.app"
@@ -163,39 +163,6 @@ function createAdminRouter(dbPath = "database.db", { publishFinish } = {}) {
       }
     );
   }
-
-  // Temporary test endpoint for restoring the finish button after MQTT migration.
-  // IMPORTANT: remove or protect before allowing real customers.
-  // Development finish buttons: shop-aware, shared by washers and dryers.
-  router.post("/machines/finish", (req, res) => {
-    const { shopId, machineId } = req.body || {};
-    if (typeof shopId !== "string" || !/^shop[a-zA-Z0-9_-]{1,30}$/.test(shopId) ||
-        typeof machineId !== "string" || !/^machine\d+$/.test(machineId)) {
-      return res.status(400).json({ error: "Invalid shop or machine" });
-    }
-    if (typeof publishFinish !== "function") {
-      return res.status(503).json({ error: "Finish service unavailable" });
-    }
-    db.get(
-      `SELECT machine, shop_id, state, status FROM machines
-       WHERE machine=? AND shop_id=? AND deleted_at IS NULL`,
-      [machineId, shopId],
-      async (err, row) => {
-        if (err) return res.status(500).json({ error: "Database error" });
-        if (!row) return res.status(404).json({ error: "Machine not found in shop" });
-        if (row.status !== "ONLINE") return res.status(409).json({ error: "Machine is offline" });
-        if (row.state !== "RUNNING") return res.status(409).json({ error: "Machine is not running" });
-        try {
-          const broker = await publishFinish(shopId, machineId);
-          console.log("[TEST FINISH]", req.ip, shopId, machineId, broker);
-          return res.json({ success: true, shopId, machineId, broker });
-        } catch (error) {
-          console.error("[ADMIN FINISH] Publish failed:", error.message);
-          return res.status(502).json({ error: "MQTT publish failed: " + error.message });
-        }
-      }
-    );
-  });
 
   router.get("/me", requireAdmin, (req, res) => {
     res.json({ user: req.admin });
