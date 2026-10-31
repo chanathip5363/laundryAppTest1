@@ -53,6 +53,7 @@ function validateCommand(command) {
 }
 
 function createMqttManager({
+  getMachineTopics = () => [],
   host = process.env.LAUNDRY_MQTT_HOST || "api.the-oasis-living.com",
   port = Number(process.env.LAUNDRY_MQTT_PORT || 8883),
   username = process.env.LAUNDRY_MQTT_USERNAME,
@@ -81,17 +82,15 @@ function createMqttManager({
     });
     client.on("error", err => console.error("[MQTT NEW]", err.message));
     client.on("connect", () => {
-      // Subscribe to registered machine topics without relying on wildcard ACL.
-      for (let i = 1; i <= 8; i++) {
-        for (const type of ["state", "status", "telemetry"]) {
-          const topic = `laundry/shop001/machine${i}/${type}`;
+      Promise.resolve().then(() => getMachineTopics()).then(topics => {
+        for (const topic of topics) {
           client.subscribe(topic, { qos: 1 }, (err, granted) => {
             if (err || !granted?.some(item => item.qos <= 2)) {
               console.error("[MQTT NEW] Subscribe failed:", topic, err?.message || "Not authorized");
             }
           });
         }
-      }
+      }).catch(err => console.error("[MQTT NEW] Machine list:", err.message));
     });
     client.on("message", (topic, payload) => {
       const match = /^laundry\/([^/]+)\/([^/]+)\/(state|status|telemetry)$/.exec(topic);

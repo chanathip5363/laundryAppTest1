@@ -13,11 +13,24 @@ const { createMqttManager } = require("./mqtt-manager.cjs");
 const USE_NEW_MQTT = false; // Change only after the pilot is ready.
 
 const newMqtt = USE_NEW_MQTT
-  ? createMqttManager()
+  ? createMqttManager({
+      getMachineTopics: () => new Promise((resolve, reject) => {
+        db.all(
+          "SELECT shop_id, machine FROM machines WHERE shop_id IS NOT NULL AND deleted_at IS NULL",
+          [],
+          (err, rows) => {
+            if (err) return reject(err);
+            resolve(rows.flatMap(row =>
+              ["state", "status", "telemetry"].map(type =>
+                `laundry/${row.shop_id}/${row.machine}/${type}`
+              )
+            ));
+          }
+        );
+      })
+    })
   : null;
-  if (newMqtt) {
-  newMqtt.connect();
-}
+
 async function sendNewMqttCommand(shopId, machineId, command) {
   if (!USE_NEW_MQTT || !newMqtt) {
     throw new Error("New MQTT is not enabled");
@@ -64,6 +77,7 @@ client.on("connect", () => {
 
 // ===== DATABASE =====
 const db = new sqlite3.Database("./database.db");
+if (newMqtt) newMqtt.connect();
 // One row per machine; a new STARTING -> RUNNING transition replaces the prior cycle.
 db.run(`CREATE TABLE IF NOT EXISTS machine_run_clock (
   machine TEXT PRIMARY KEY,
