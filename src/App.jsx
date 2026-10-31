@@ -567,12 +567,26 @@ const beginPayment = async () => {
     return data;
   };
 
-const finishWash = (machine) => {
-  if (!client) return;
+const finishWash = async (machine) => {
+  if (machine === "machine1") {
+    try {
+      const res = await fetch(
+        `${PAYMENT_API}/admin/test-finish/machine1`,
+        { method: "POST" }
+      );
 
-  client.publish(`laundry/${machine}/finish`, "done");
-
-  console.log("Finish pressed:", machine);
+      if (!res.ok) {
+        throw new Error("ส่งคำสั่ง finish ไม่สำเร็จ");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("จำลองซักเสร็จไม่สำเร็จ");
+      return;
+    }
+  } else {
+    if (!client) return;
+    client.publish(`laundry/${machine}/finish`, "done");
+  }
 
   setStep(1);
   setMode(null);
@@ -712,7 +726,6 @@ return (
 {step === 2 && (
   <WashPriceSelection
     selectedMachine={selectedMachine}
-    onPricingLoaded={setWashPricing}
     onPricingLoaded={setWashPricing}
     onSelect20={(price) => {
       setPrices(price);
