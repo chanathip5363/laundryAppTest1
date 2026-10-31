@@ -11,8 +11,6 @@ const { createMqttManager } = require("./mqtt-manager.cjs");
 
 // MQTT ใหม่: ยังไม่เปิดใช้งาน
 const USE_NEW_MQTT = false; // Change only after the pilot is ready.
-const PILOT_SHOP = "shop001";
-const PILOT_MACHINE = "machine1";
 
 const newMqtt = USE_NEW_MQTT
   ? createMqttManager()
@@ -830,7 +828,7 @@ db.run(
 // MQTT เดิมยังรับข้อความเหมือนเดิม
 client.on("message", (topic, message) => {
   // Once pilot is enabled, ignore stale HiveMQ updates for machine1 only.
-  if (USE_NEW_MQTT && /^laundry\/machine1\/(state|status|telemetry)$/.test(topic)) return;
+  if (USE_NEW_MQTT && /^laundry\/machine\d+\/(state|status|telemetry)$/.test(topic)) return;
   handleMachineMessage(topic, message);
 });
 
@@ -838,7 +836,7 @@ client.on("message", (topic, message) => {
 if (newMqtt) {
   newMqtt.onMessage(({ shopId, machineId, type, message }) => {
     const parsed = parseNewMqttTopic(`laundry/${shopId}/${machineId}/${type}`);
-    if (!parsed || parsed.shopId !== PILOT_SHOP || parsed.machineId !== PILOT_MACHINE) return;
+    if (!parsed) return;
 
     db.get(
       "SELECT machine FROM machines WHERE machine=? AND shop_id=? AND deleted_at IS NULL",

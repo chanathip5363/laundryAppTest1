@@ -81,14 +81,16 @@ function createMqttManager({
     });
     client.on("error", err => console.error("[MQTT NEW]", err.message));
     client.on("connect", () => {
-      // Pilot machine only: avoid wildcard subscriptions until shop ACLs are provisioned.
-      for (const type of ["state", "status", "telemetry"]) {
-        const topic = `laundry/shop001/machine1/${type}`;
-        client.subscribe(topic, { qos: 1 }, (err, granted) => {
-          if (err || !granted?.some(item => item.qos !== 128)) {
-            console.error("[MQTT NEW] Subscribe failed:", topic, err?.message || "Not authorized");
-          }
-        });
+      // Subscribe to registered machine topics without relying on wildcard ACL.
+      for (let i = 1; i <= 8; i++) {
+        for (const type of ["state", "status", "telemetry"]) {
+          const topic = `laundry/shop001/machine${i}/${type}`;
+          client.subscribe(topic, { qos: 1 }, (err, granted) => {
+            if (err || !granted?.some(item => item.qos <= 2)) {
+              console.error("[MQTT NEW] Subscribe failed:", topic, err?.message || "Not authorized");
+            }
+          });
+        }
       }
     });
     client.on("message", (topic, payload) => {
