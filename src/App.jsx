@@ -43,7 +43,6 @@ function App() {
   const shopId =
     new URLSearchParams(window.location.search).get("shop") || "shop001";
 
-  const [finishAdminToken, setFinishAdminToken] = useState(null);
   const [status, setStatus] = useState("Disconnected");
   const [program, setProgram] = useState(0);
   const [prices, setPrices] = useState({}); // 200369-02 เพิ่ม state เก็บราคา
@@ -535,38 +534,16 @@ const beginPayment = async () => {
   };
 
 const finishWash = async (machine) => {
-  // Test controls require an existing Admin account. No credentials are embedded in React.
+  if (!window.confirm(`จำลองจบรอบ ${machine} ใช่หรือไม่?`)) return;
   try {
-    let token = finishAdminToken;
-    if (!token) {
-      const username = window.prompt("ชื่อผู้ใช้ Admin สำหรับปุ่มทดสอบ:");
-      if (!username) return;
-      const password = window.prompt("รหัสผ่าน Admin:");
-      if (!password) return;
-      const loginRes = await fetch(`${PAYMENT_API}/admin/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-        signal: AbortSignal.timeout(15000),
-      });
-      const loginData = await loginRes.json();
-      if (!loginRes.ok || !loginData.token) throw new Error("เข้าสู่ระบบ Admin ไม่สำเร็จ");
-      token = loginData.token;
-      setFinishAdminToken(token);
-    }
-
     const res = await fetch(`${PAYMENT_API}/admin/machines/finish`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ shopId, machineId: machine }),
       signal: AbortSignal.timeout(15000),
     });
     const result = await res.json();
     if (!res.ok || !result.success) {
-      if (res.status === 401) setFinishAdminToken(null);
       throw new Error(result.error || "ส่งคำสั่ง finish ไม่สำเร็จ");
     }
     alert(`ส่งคำสั่งจบรอบไปยัง ${machine} แล้ว (รอ ESP32 ดำเนินการ)`);
