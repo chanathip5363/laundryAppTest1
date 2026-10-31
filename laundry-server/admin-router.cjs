@@ -164,27 +164,10 @@ function createAdminRouter(dbPath = "database.db", { publishFinish } = {}) {
     );
   }
 
-  // TEMPORARY TEST ONLY: enable explicitly on the server and restrict to allowlisted IPs.
-  // Browser Origin/CORS is NOT an authentication mechanism.
-  const TEST_FINISH_ENABLED = process.env.LAUNDRY_TEST_FINISH_ENABLED === "true";
-  const TEST_FINISH_ALLOWED_IPS = new Set(
-    (process.env.LAUNDRY_TEST_FINISH_ALLOWED_IPS || "")
-      .split(",").map(ip => ip.trim()).filter(Boolean)
-  );
-  const finishAttempts = new Map();
-  function requireTestFinish(req, res, next) {
-    if (!TEST_FINISH_ENABLED) return res.status(404).json({ error: "Test mode disabled" });
-    // Require explicit IP allowlist, never default to public access.
-    const ip = req.ip;
-    if (!TEST_FINISH_ALLOWED_IPS.has(ip)) return res.status(403).json({ error: "Test access denied" });
-    const now = Date.now();
-    const last = finishAttempts.get(ip) || 0;
-    if (now - last < 3000) return res.status(429).json({ error: "Please wait before retrying" });
-    finishAttempts.set(ip, now);
-    next();
-  }
+  // Temporary test endpoint for restoring the finish button after MQTT migration.
+  // IMPORTANT: remove or protect before allowing real customers.
   // Development finish buttons: shop-aware, shared by washers and dryers.
-  router.post("/machines/finish", requireTestFinish, (req, res) => {
+  router.post("/machines/finish", (req, res) => {
     const { shopId, machineId } = req.body || {};
     if (typeof shopId !== "string" || !/^shop[a-zA-Z0-9_-]{1,30}$/.test(shopId) ||
         typeof machineId !== "string" || !/^machine\d+$/.test(machineId)) {
