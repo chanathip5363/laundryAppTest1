@@ -54,7 +54,13 @@ function parseNewMqttTopic(topic) {
 const app = express();
 app.use((req, res, next) => req.path.startsWith("/admin/") ? next() : cors()(req, res, next));
 app.use(express.json());
-app.use("/admin", createAdminRouter());
+app.use("/admin", createAdminRouter("database.db", () => {
+  if (newMqtt) {
+    newMqtt.syncSubscriptions().catch(err =>
+      console.error("[MQTT NEW] Admin sync:", err.message)
+    );
+  }
+}));
 
 const usedTx = new Set();
 app.use(bodyParser.json());

@@ -69,6 +69,33 @@ function createMqttManager({
   // No connection is created until connect() is explicitly called.
   let client = null;
   let messageHandler = null;
+  let subscribedTopics = new Set();
+
+  async function syncSubscriptions() {
+    if (!client || !client.connected) return;
+
+    const topics = new Set(await getMachineTopics());
+    const removed = [...subscribedTopics].filter(t => !topics.has(t));
+    const added = [...topics].filter(t => !subscribedTopics.has(t));
+
+    for (const topic of removed) {
+      await new Promise((resolve, reject) =>
+        client.unsubscribe(topic, err => err ? reject(err) : resolve())
+      );
+      subscribedTopics.delete(topic);
+    }
+
+    for (const topic of added) {
+      await new Promise((resolve, reject) =>
+        client.subscribe(topic, { qos: 1 }, (err, granted) =>
+          err || !granted?.some(g => g.qos <= 2)
+            ? reject(err || new Error("Subscribe rejected: " + topic))
+            : resolve()
+        )
+      );
+      subscribedTopics.add(topic);
+    }
+  }
 
   function connect() {
     if (client) return client;
@@ -82,15 +109,10 @@ function createMqttManager({
     });
     client.on("error", err => console.error("[MQTT NEW]", err.message));
     client.on("connect", () => {
-      Promise.resolve().then(() => getMachineTopics()).then(topics => {
-        for (const topic of topics) {
-          client.subscribe(topic, { qos: 1 }, (err, granted) => {
-            if (err || !granted?.some(item => item.qos <= 2)) {
-              console.error("[MQTT NEW] Subscribe failed:", topic, err?.message || "Not authorized");
-            }
-          });
-        }
-      }).catch(err => console.error("[MQTT NEW] Machine list:", err.message));
+      subscribedTopics.clear();
+      syncSubscriptions().catch(err =>
+        console.error("[MQTT NEW] Subscription sync:", err.message)
+      );
     });
     client.on("message", (topic, payload) => {
       const match = /^laundry\/([^/]+)\/([^/]+)\/(state|status|telemetry)$/.exec(topic);
@@ -130,7 +152,7 @@ function createMqttManager({
     client = null;
   }
 
-  return { connect, publishCommand, onMessage, close };
+  return { connect, publishCommand, onMessage, close, syncSubscriptions };
 }
 
 module.exports = { createMqttManager, commandTopic, validateCommand };

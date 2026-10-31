@@ -5,7 +5,7 @@ const { verifyPassword } = require("./admin-auth.cjs");
 
 const SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
-function createAdminRouter(dbPath = "database.db") {
+function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {}) {
   const router = express.Router();
   const allowedOrigins = new Set([
     "https://laundry-app-test1.vercel.app"
@@ -364,6 +364,7 @@ function createAdminRouter(dbPath = "database.db") {
 
       await run("COMMIT");
       transactionStarted = false;
+      onMachinesChanged();
 
       return res.status(201).json({
         machine: {
@@ -542,6 +543,7 @@ function createAdminRouter(dbPath = "database.db") {
 
       await run("COMMIT");
       inTransaction = false;
+      onMachinesChanged();
       return res.json({ machine, shop_id: shopId, enabled: 0, deleted_at: deletedAt });
     } catch (err) {
       if (inTransaction) {
