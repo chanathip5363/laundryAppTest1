@@ -9,22 +9,10 @@ const { createAdminRouter } = require("./admin-router.cjs");
 const { estimateMinutes } = require("./machine-time.cjs");
 const { createMqttManager } = require("./mqtt-manager.cjs");
 
-// MQTT ใหม่: ยังไม่เปิดใช้งาน
-const USE_NEW_MQTT = false; // Change only after the pilot is ready.
-const PILOT_SHOP = "shop001";
-const PILOT_MACHINE = "machine1";
-
-const newMqtt = USE_NEW_MQTT
-  ? createMqttManager()
-  : null;
-  if (newMqtt) {
-  newMqtt.connect();
-}
+// All shops and machines use one Mosquitto connection and shop-scoped topics.
+const newMqtt = createMqttManager();
+const client = newMqtt.connect();
 async function sendNewMqttCommand(shopId, machineId, command) {
-  if (!USE_NEW_MQTT || !newMqtt) {
-    throw new Error("New MQTT is not enabled");
-  }
-
   await newMqtt.publishCommand(shopId, machineId, command);
 }
 
@@ -43,26 +31,17 @@ function parseNewMqttTopic(topic) {
 const app = express();
 app.use((req, res, next) => req.path.startsWith("/admin/") ? next() : cors()(req, res, next));
 app.use(express.json());
-app.use("/admin", createAdminRouter());
+async function publishFinish(shopId, machineId) {
+  await sendNewMqttCommand(shopId, machineId, { type: "finish" });
+  return "mosquitto";
+}
+
+app.use("/admin", createAdminRouter("database.db", { publishFinish }));
 
 const usedTx = new Set();
 app.use(bodyParser.json());
 
-// ===== MQTT =====
-const client = mqtt.connect("mqtts://1f987687489a42f296be8b2579cd71f5.s1.eu.hivemq.cloud:8883",
-    {
-        username: "ESP32",
-        password: "Laundry123"
-    }
-);
-
-client.on("connect", () => {
-    console.log("MQTT connected");
-
-    client.subscribe("laundry/+/state");
-    client.subscribe("laundry/+/status");    
-    client.subscribe("laundry/+/telemetry");
-});
+// ===== MQTT: single Mosquitto broker =====
 
 // ===== DATABASE =====
 const db = new sqlite3.Database("./database.db");
@@ -333,54 +312,14 @@ isMachineOnline(machine, (online) => {
       })
 };
 
-if (USE_NEW_MQTT) {
-  // MQTT ใหม่: ส่ง JSON
+if (true) {
+  // Mosquitto: send JSON to shop-scoped command topic
   sendNewMqttCommand(machineRow.shop_id, machine, newCommand)
     .catch((err) => {
       console.error("[NEW MQTT] Command failed:", err.message);
     });
 
-} else if (type === "dry") {
-  // MQTT เดิม: เครื่องอบ
-  client.publish(
-    `laundry/${machine}/temperatureOption`,
-    String(temperatureOption)
-  );
-
-  client.publish(
-    `laundry/${machine}/wrinkleOption`,
-    String(wrinkleOption)
-  );
-
-  client.publish(
-    `laundry/${machine}/program`,
-    program.toString()
-  );
-
-  console.log("DRY command:", {
-    machine,
-    program,
-    temperatureOption,
-    wrinkleOption
-  });
-
-} else {
-  // MQTT เดิม: เครื่องซัก
-  client.publish(
-    `laundry/${machine}/tempPulse`,
-    String(tempPulse || 0)
-  );
-
-  client.publish(
-    `laundry/${machine}/aromaPulse`,
-    String(aromaPulse || 0)
-  );
-
-  client.publish(
-    `laundry/${machine}/program`,
-    program.toString()
-  );
-} 
+ }
           console.log("Start machine:", machine);
           return res.sendStatus(200);
         }
@@ -474,7 +413,7 @@ app.post("/request-qr", (req, res) => {
 });
 
 // ===== รับ status จาก ESP =====
-client.subscribe("laundry/+/state");
+
 
 function handleMachineMessage(topic, message) {
         // ===== บันทึกข้อมูลไฟฟ้าและน้ำจาก ESP32 =====
@@ -827,37 +766,22 @@ db.run(
 
 }
 
-// MQTT เดิมยังรับข้อความเหมือนเดิม
-client.on("message", (topic, message) => {
-  // Once pilot is enabled, ignore stale HiveMQ updates for machine1 only.
-  if (USE_NEW_MQTT && /^laundry\/machine1\/(state|status|telemetry)$/.test(topic)) return;
-  handleMachineMessage(topic, message);
-});
-
-// MQTT ใหม่: ตรวจสอบ shop_id ก่อนส่งสถานะเข้าระบบเดิม
-if (newMqtt) {
-  newMqtt.onMessage(({ shopId, machineId, type, message }) => {
-    const parsed = parseNewMqttTopic(`laundry/${shopId}/${machineId}/${type}`);
-    if (!parsed || parsed.shopId !== PILOT_SHOP || parsed.machineId !== PILOT_MACHINE) return;
-
-    db.get(
-      "SELECT machine FROM machines WHERE machine=? AND shop_id=? AND deleted_at IS NULL",
-      [parsed.machineId, parsed.shopId],
-      (err, row) => {
-        if (err) {
-          console.error("[NEW MQTT] Machine lookup failed:", err.message);
-          return;
-        }
-        if (!row) {
-          console.warn("[NEW MQTT] Unknown shop/machine:", parsed.shopId, parsed.machineId);
-          return;
-        }
-        // Reuse existing state/status/telemetry handlers and energy/water recording.
-        handleMachineMessage(`laundry/${parsed.machineId}/${parsed.type}`, Buffer.from(message));
+// Mosquitto: verify the shop/machine association before applying status.
+newMqtt.onMessage(({ shopId, machineId, type, message }) => {
+  const parsed = parseNewMqttTopic(`laundry/${shopId}/${machineId}/${type}`);
+  if (!parsed) return;
+  db.get(
+    "SELECT machine FROM machines WHERE machine=? AND shop_id=? AND deleted_at IS NULL",
+    [parsed.machineId, parsed.shopId],
+    (err, row) => {
+      if (err || !row) {
+        console.warn("[MQTT] Unknown machine or shop:", parsed.shopId, parsed.machineId, err?.message || "");
+        return;
       }
-    );
-  });
-}
+      handleMachineMessage(`laundry/${parsed.machineId}/${parsed.type}`, Buffer.from(message));
+    }
+  );
+});
 
 // ===== start server =====
 app.listen(3000, ()=>{

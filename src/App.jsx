@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { getPaymentQrUrl } from "./utils/paymentQr";
-import mqttClient from "./mqtt/mqttClient";
 import { getTempPulse } from "./utils/getTempPulse";
 import { getAromaPulse } from "./utils/getAromaPulse";
-import { MQTT_TOPICS } from "./constants/mqttTopics";
-import { setupMqttHandlers } from "./mqtt/mqttHandlers";
 import { calculateTotalPrice } from "./price/priceLogic";
 import { calculateDryTotalPrice } from "./price/dryPriceLogic";
 import ServiceSelection from "./components/ServiceSelection";
@@ -46,7 +43,7 @@ function App() {
   const shopId =
     new URLSearchParams(window.location.search).get("shop") || "shop001";
 
-  const [client, setClient] = useState(null);
+  const [finishAdminToken, setFinishAdminToken] = useState(null);
   const [status, setStatus] = useState("Disconnected");
   const [program, setProgram] = useState(0);
   const [prices, setPrices] = useState({}); // 200369-02 เพิ่ม state เก็บราคา
@@ -341,37 +338,7 @@ const [aromaSelected, setAromaSelected] = useState(null);
 
 
 
-  useEffect(() => {
-
-    const mqtt = mqttClient;   
-    mqtt.on("connect", () => {
-      console.log("MQTT Connected");
-      setStatus("Connected");
-
-      mqtt.subscribe("laundry/+/state");
-      mqtt.subscribe("laundry/+/status");
-    });
-
-    mqtt.on("message", (topic, message) => {
-      const parts = topic.split("/");
-      const type = parts[2]?.toUpperCase();
-      console.log(`[${type}] ${parts[1]} = ${message.toString()}`);
-    });
-
-    mqtt.on("error", (err) => {
-      console.log("MQTT error:", err);
-    });
-
-    setClient(mqtt);
-
-    return () => {
-  // ไม่ต้องปิด mqttClient เพราะใช้ร่วมกันทั้งโปรแกรม
-};
-
-    // return () => {
-    //   mqtt.end();
-    // };
-  }, []);
+  // Device state is supplied by the server APIs; the browser does not connect to HiveMQ.
 
   const buildPaymentSelection = () => {
 const machine = selectedMachine;
@@ -567,15 +534,48 @@ const beginPayment = async () => {
     return data;
   };
 
-const finishWash = (machine) => {
-  if (!client) return;
+const finishWash = async (machine) => {
+  // Test controls require an existing Admin account. No credentials are embedded in React.
+  try {
+    let token = finishAdminToken;
+    if (!token) {
+      const username = window.prompt("ชื่อผู้ใช้ Admin สำหรับปุ่มทดสอบ:");
+      if (!username) return;
+      const password = window.prompt("รหัสผ่าน Admin:");
+      if (!password) return;
+      const loginRes = await fetch(`${PAYMENT_API}/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const loginData = await loginRes.json();
+      if (!loginRes.ok || !loginData.token) throw new Error("เข้าสู่ระบบ Admin ไม่สำเร็จ");
+      token = loginData.token;
+      setFinishAdminToken(token);
+    }
 
-  client.publish(`laundry/${machine}/finish`, "done");
-
-  console.log("Finish pressed:", machine);
-
-  setStep(1);
-  setMode(null);
+    const res = await fetch(`${PAYMENT_API}/admin/machines/finish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ shopId, machineId: machine }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const result = await res.json();
+    if (!res.ok || !result.success) {
+      if (res.status === 401) setFinishAdminToken(null);
+      throw new Error(result.error || "ส่งคำสั่ง finish ไม่สำเร็จ");
+    }
+    alert(`ส่งคำสั่งจบรอบไปยัง ${machine} แล้ว (รอ ESP32 ดำเนินการ)`);
+    setStep(1);
+    setMode(null);
+  } catch (err) {
+    console.error("[FINISH]", err);
+    alert(`จำลองซัก/อบเสร็จไม่สำเร็จ: ${err.message}`);
+  }
 };
 
 
@@ -712,7 +712,6 @@ return (
 {step === 2 && (
   <WashPriceSelection
     selectedMachine={selectedMachine}
-    onPricingLoaded={setWashPricing}
     onPricingLoaded={setWashPricing}
     onSelect20={(price) => {
       setPrices(price);
