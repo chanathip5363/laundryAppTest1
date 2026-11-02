@@ -676,7 +676,7 @@ export default function AdminApp() {
 
   return (
     <main style={{
-      maxWidth: 480,
+      maxWidth: user ? 1120 : 480,
       margin: "60px auto",
       padding: 24,
       fontFamily: "Arial, sans-serif",
@@ -692,6 +692,7 @@ export default function AdminApp() {
 
           <DashboardPanel token={token} shops={shops} />
 
+          <div style={{ maxWidth: 480, margin: "0 auto" }}>
           <h3>เพิ่มร้านใหม่</h3>
           <form onSubmit={handleCreateShop}>
             <label htmlFor="new-shop-id">รหัสร้าน</label>
@@ -1057,6 +1058,7 @@ export default function AdminApp() {
           )}
 
           <button onClick={handleLogout}>ออกจากระบบ</button>
+          </div>
         </section>
       ) : (
         <form onSubmit={handleLogin}>
