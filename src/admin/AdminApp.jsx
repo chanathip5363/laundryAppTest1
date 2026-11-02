@@ -781,13 +781,11 @@ export default function AdminApp() {
                         {" "}
                         <button
                           type="button"
-                          disabled={
-                            clearingMachine !== null ||
-                            (machine.state === "RESERVED" &&
-                              Number(machine.reserved_until) > Date.now()) ||
-                            (machine.status === "ONLINE" &&
-                              ["RUNNING", "STARTING"].includes(machine.state))
-                          }
+                        disabled={
+                          clearingMachine !== null ||
+                          (machine.state === "RESERVED" &&
+                            Number(machine.reserved_until) > Date.now())
+                        }
                           onClick={() => handleClearMachine(machine)}
                         >
                           {clearingMachine === machine.machine ? "กำลัง CLEAR..." : "CLEAR"}
