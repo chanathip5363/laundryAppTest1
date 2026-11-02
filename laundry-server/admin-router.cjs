@@ -634,7 +634,7 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {})
   // Admin CLEAR: reset stale server state only; never publish MQTT commands.
   router.patch("/shops/:shopId/machines/:machine/clear", requireAdmin, async (req, res) => {
     const { shopId, machine } = req.params;
-    if (!/^machine\\d+$/.test(machine)) {
+    if (!/^machine\d+$/.test(machine)) {
       return res.status(400).json({ error: "Invalid machine" });
     }
 
@@ -662,10 +662,6 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {})
       if (row.state === "RESERVED" && Number(row.reserved_until) > Date.now()) {
         await run("ROLLBACK"); started = false;
         return res.status(409).json({ error: "Machine has an active reservation" });
-      }
-      if (row.status === "ONLINE" && ["RUNNING", "STARTING"].includes(row.state)) {
-        await run("ROLLBACK"); started = false;
-        return res.status(409).json({ error: "Machine is online and may be operating" });
       }
       await run(
         `UPDATE machines
@@ -800,6 +796,128 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {})
       return res.status(500).json({ error: "Pricing save failed" });
     } finally {
       await new Promise(resolve => writeDb.close(() => resolve()));
+    }
+  });
+
+
+  // Read-only dashboard: paid orders and per-cycle usage; never controls machines.
+  router.get("/dashboard", requireAdmin, async (req, res) => {
+    const shopId = req.query.shop_id || "all";
+    const from = req.query.from;
+    const to = req.query.to;
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (typeof shopId !== "string" || shopId.length > 64 ||
+        typeof from !== "string" || typeof to !== "string" ||
+        !dateRe.test(from) || !dateRe.test(to)) {
+      return res.status(400).json({ error: "shop_id, from and to (YYYY-MM-DD) required" });
+    }
+    // Reporting day is Thailand local time. Date range is inclusive.
+    const start = Date.parse(`${from}T00:00:00+07:00`);
+    const end = Date.parse(`${to}T00:00:00+07:00`) + 86400000;
+    if (!Number.isFinite(start) || !Number.isFinite(end) ||
+        new Date(start + 25200000).toISOString().slice(0, 10) !== from ||
+        new Date(end - 86400000 + 25200000).toISOString().slice(0, 10) !== to ||
+        end <= start || end - start > 366 * 86400000) {
+      return res.status(400).json({ error: "Invalid date range (maximum 366 days)" });
+    }
+    const all = (sql, params = []) => new Promise((resolve, reject) =>
+      db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows)));
+    const localDay = (ms) => new Date(ms + 25200000).toISOString().slice(0, 10);
+    const finite = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+    try {
+      const shops = await all("SELECT shop_id, shop_name FROM shops ORDER BY shop_id");
+      if (shopId !== "all" && !shops.some(s => s.shop_id === shopId)) {
+        return res.status(404).json({ error: "Shop not found" });
+      }
+      const machines = await all(
+        `SELECT machine, shop_id, display_name, machine_type FROM machines
+         WHERE (? = 'all' OR shop_id = ?) ORDER BY shop_id, machine`,
+        [shopId, shopId]);
+      const machineMap = new Map(machines.map(m => [m.machine, m]));
+      const orders = await all(
+        `SELECT txid, machine, shop_id, amount_satang, created_at
+         FROM payment_orders WHERE status = 'PAID' AND is_test = 0
+         AND created_at >= ? AND created_at < ?
+         AND (? = 'all' OR shop_id = ?)
+         ORDER BY created_at DESC`, [start, end, shopId, shopId]);
+      const usage = await all(
+        `SELECT u.txid, u.machine, u.started_at, u.finished_at, u.status,
+                u.energy_used_kwh, u.water_used_liters,
+                u.energy_calculated_kwh
+         FROM machine_usage u
+         WHERE u.started_at IS NOT NULL
+         ORDER BY u.started_at DESC`);
+      const summary = { paid_orders: 0, revenue_satang: 0, usage_cycles: 0,
+        completed_cycles: 0, energy_kwh: 0, water_liters: 0,
+        energy_samples: 0, water_samples: 0, estimated_cycles: 0 };
+      const byMachine = new Map(machines.map(m => [m.machine, {
+        ...m, paid_orders: 0, revenue_satang: 0, usage_cycles: 0,
+        completed_cycles: 0, energy_kwh: 0, water_liters: 0,
+        energy_samples: 0, water_samples: 0, estimated_cycles: 0
+      }]));
+      const byDay = new Map();
+      function dayRecord(day) {
+        if (!byDay.has(day)) byDay.set(day, { day, paid_orders: 0,
+          revenue_satang: 0, usage_cycles: 0, energy_kwh: 0, water_liters: 0 });
+        return byDay.get(day);
+      }
+      for (const o of orders) {
+        if (!Number.isSafeInteger(o.amount_satang) || o.amount_satang < 0) continue;
+        // Order shop_id is authoritative even if machine metadata later changes.
+        summary.paid_orders++; summary.revenue_satang += o.amount_satang;
+        const day = dayRecord(localDay(o.created_at));
+        day.paid_orders++; day.revenue_satang += o.amount_satang;
+        const m = byMachine.get(o.machine);
+        if (m && m.shop_id === o.shop_id) {
+          m.paid_orders++; m.revenue_satang += o.amount_satang;
+        }
+      }
+      const recentUsage = [];
+      for (const u of usage) {
+        const m = machineMap.get(u.machine);
+        if (!m) continue;
+        const timestamp = Date.parse(u.started_at);
+        if (!Number.isFinite(timestamp) || timestamp < start || timestamp >= end) continue;
+        const day = dayRecord(localDay(timestamp));
+        summary.usage_cycles++; byMachine.get(u.machine).usage_cycles++;
+        day.usage_cycles++;
+        const completed = ["FINISHED", "FINISHED_ESTIMATED"].includes(u.status);
+        if (completed) {
+          summary.completed_cycles++; byMachine.get(u.machine).completed_cycles++;
+          if (u.status === "FINISHED_ESTIMATED") {
+            summary.estimated_cycles++; byMachine.get(u.machine).estimated_cycles++;
+          }
+          if (finite(u.energy_used_kwh) && Number(u.energy_used_kwh) >= 0) {
+            const value = Number(u.energy_used_kwh);
+            summary.energy_kwh += value; byMachine.get(u.machine).energy_kwh += value;
+            summary.energy_samples++; byMachine.get(u.machine).energy_samples++;
+            day.energy_kwh += value;
+          }
+          if (finite(u.water_used_liters) && Number(u.water_used_liters) >= 0) {
+            const value = Number(u.water_used_liters);
+            summary.water_liters += value; byMachine.get(u.machine).water_liters += value;
+            summary.water_samples++; byMachine.get(u.machine).water_samples++;
+            day.water_liters += value;
+          }
+        }
+        if (recentUsage.length < 100) recentUsage.push({
+          txid: u.txid, machine: u.machine, shop_id: m.shop_id,
+          started_at: u.started_at, finished_at: u.finished_at,
+          status: u.status, energy_used_kwh: u.energy_used_kwh,
+          water_used_liters: u.water_used_liters
+        });
+      }
+      res.set("Cache-Control", "no-store");
+      return res.json({ success: true, shop_id: shopId, from, to,
+        timezone: "Asia/Bangkok", revenue_source: "payment_orders.PAID (is_test=0)",
+        legacy_transactions_included: false,
+        usage_shop_attribution: "current machine.shop_id",
+        shops, summary, machines: [...byMachine.values()],
+        daily: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)),
+        recent_usage: recentUsage });
+    } catch (error) {
+      console.error("Admin dashboard failed:", error);
+      return res.status(500).json({ error: "Dashboard query failed" });
     }
   });
 

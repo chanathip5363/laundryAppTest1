@@ -3,6 +3,137 @@ import MachineRunTime from "../components/MachineRunTime";
 
 const API = "https://api.the-oasis-living.com";
 
+
+const thb = (satang) => (Number(satang || 0) / 100).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const decimal = (value, digits = 2) => Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: digits });
+const thaiDay = (date) => new Date(date.getTime() + 7 * 3600000).toISOString().slice(0, 10);
+
+function DashboardPanel({ token, shops }) {
+  const [shopId, setShopId] = useState("all");
+  const [from, setFrom] = useState(() => thaiDay(new Date(Date.now() - 29 * 86400000)));
+  const [to, setTo] = useState(() => thaiDay(new Date()));
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const [metric, setMetric] = useState("revenue_satang");
+
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    const controller = new AbortController();
+    async function load() {
+      setLoading(true);
+      setError("");
+      try {
+        const query = new URLSearchParams({ shop_id: shopId, from, to });
+        const response = await fetch(`${API}/admin/dashboard?${query}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store", signal: controller.signal
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `Dashboard HTTP ${response.status}`);
+        if (active) setData(result);
+      } catch (err) {
+        if (active && err.name !== "AbortError") { setError(err.message); setData(null); }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    load();
+    return () => { active = false; controller.abort(); };
+  }, [token, shopId, from, to, refresh]);
+
+  const panel = { border: "1px solid #d9e0e8", borderRadius: 12, padding: 16, background: "#fff" };
+  const metrics = [
+    ["รายได้จากรายการ PAID", data?.summary?.revenue_satang, "บาท", true],
+    ["รายการชำระเงิน", data?.summary?.paid_orders, "รายการ"],
+    ["รอบการใช้งาน", data?.summary?.usage_cycles, "รอบ"],
+    ["รอบที่จบแล้ว", data?.summary?.completed_cycles, "รอบ"],
+    ["พลังงานไฟฟ้า", data?.summary?.energy_kwh, "kWh"],
+    ["ปริมาณน้ำ", data?.summary?.water_liters, "ลิตร"]
+  ];
+  const graphOptions = [
+    ["revenue_satang", "รายได้ (บาท)"], ["usage_cycles", "จำนวนรอบ"],
+    ["energy_kwh", "พลังงาน (kWh)"], ["water_liters", "น้ำ (ลิตร)"]
+  ];
+  const days = data?.daily || [];
+  const maximum = Math.max(1, ...days.map(d => Number(d[metric]) || 0));
+  return (
+    <section style={{ ...panel, margin: "22px 0", background: "#f6f8fb" }}>
+      <h2 style={{ marginTop: 0 }}>Dashboard รายได้และทรัพยากร</h2>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end" }}>
+        <label>ร้าน<br /><select value={shopId} onChange={e => setShopId(e.target.value)}>
+          <option value="all">ทุกร้าน</option>
+          {shops.map(shop => <option key={shop.shop_id} value={shop.shop_id}>{shop.shop_name} ({shop.shop_id})</option>)}
+        </select></label>
+        <label>ตั้งแต่<br /><input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label>
+        <label>ถึง<br /><input type="date" value={to} onChange={e => setTo(e.target.value)} /></label>
+        <button type="button" onClick={() => setRefresh(v => v + 1)} disabled={loading}>รีเฟรช</button>
+      </div>
+      {loading && <p role="status">กำลังโหลด Dashboard...</p>}
+      {error && <p role="alert" style={{ color: "#b42318" }}>โหลด Dashboard ไม่สำเร็จ: {error}</p>}
+      {data && <>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 18 }}>
+          {metrics.map(([label, value, unit, money]) => <div key={label} style={panel}>
+            <div style={{ color: "#475467", fontSize: 13 }}>{label}</div>
+            <strong style={{ fontSize: 23, display: "block", marginTop: 7 }}>{money ? thb(value) : decimal(value)}</strong>
+            <small>{unit}</small>
+          </div>)}
+        </div>
+        <p style={{ fontSize: 12, color: "#475467" }}>
+          รายได้: payment_orders สถานะ PAID และ is_test=0 เท่านั้น (ไม่รวม transactions เดิม) ·
+          ไฟฟ้ามีข้อมูล {data.summary.energy_samples} รอบ · น้ำมีข้อมูล {data.summary.water_samples} รอบ ·
+          ค่าประมาณ {data.summary.estimated_cycles} รอบ
+        </p>
+        <div style={{ ...panel, marginTop: 12 }}>
+          <h3 style={{ marginTop: 0 }}>แนวโน้มรายวัน</h3>
+          <label>แสดงกราฟ: <select value={metric} onChange={e => setMetric(e.target.value)}>
+            {graphOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select></label>
+          {days.length === 0 ? <p>ไม่มีข้อมูลในช่วงเวลานี้</p> :
+            <div style={{ display: "flex", gap: 5, alignItems: "end", height: 180, overflowX: "auto", paddingTop: 12 }}>
+              {days.map(d => {
+                const raw = Number(d[metric]) || 0;
+                const value = metric === "revenue_satang" ? thb(raw) : decimal(raw);
+                return <div key={d.day} title={`${d.day}: ${value}`} style={{ flex: "1 0 25px", minWidth: 25, maxWidth: 65, textAlign: "center" }}>
+                  <div style={{ background: "#2563eb", borderRadius: "4px 4px 0 0", height: `${Math.max(raw > 0 ? 3 : 0, raw / maximum * 145)}px` }} />
+                  <small style={{ fontSize: 9, whiteSpace: "nowrap" }}>{d.day.slice(5)}</small>
+                </div>;
+              })}
+            </div>}
+        </div>
+        <div style={{ ...panel, marginTop: 12, overflowX: "auto" }}>
+          <h3 style={{ marginTop: 0 }}>สรุปแยกเครื่อง</h3>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead><tr>{["ร้าน", "เครื่อง", "รายการจ่าย", "รายได้ (บาท)", "รอบ", "ไฟฟ้า (kWh)", "น้ำ (ลิตร)", "รอบประมาณ"].map(h =>
+              <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: 7 }}>{h}</th>)}</tr></thead>
+            <tbody>{data.machines.map(m => <tr key={m.machine}>
+              <td style={{ padding: 7 }}>{m.shop_id}</td><td>{m.display_name || m.machine} ({m.machine})</td>
+              <td>{m.paid_orders}</td><td>{thb(m.revenue_satang)}</td><td>{m.usage_cycles}</td>
+              <td>{m.energy_samples ? decimal(m.energy_kwh) : "ไม่มีข้อมูล"}</td>
+              <td>{m.water_samples ? decimal(m.water_liters) : "ไม่มีข้อมูล"}</td><td>{m.estimated_cycles}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        <div style={{ ...panel, marginTop: 12, overflowX: "auto" }}>
+          <h3 style={{ marginTop: 0 }}>ประวัติการใช้งานล่าสุด (สูงสุด 100 รอบ)</h3>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead><tr>{["เริ่มใช้งาน", "ร้าน", "เครื่อง", "สถานะ", "ไฟฟ้า (kWh)", "น้ำ (ลิตร)"].map(h =>
+              <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: 7 }}>{h}</th>)}</tr></thead>
+            <tbody>{data.recent_usage.map((u, index) => <tr key={`${u.txid}-${index}`}>
+              <td style={{ padding: 7, whiteSpace: "nowrap" }}>{u.started_at ? new Date(u.started_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }) : "-"}</td>
+              <td>{u.shop_id}</td><td>{u.machine}</td><td>{u.status}</td>
+              <td>{u.energy_used_kwh == null ? "ไม่มีข้อมูล" : decimal(u.energy_used_kwh)}</td>
+              <td>{u.water_used_liters == null ? "ไม่มีข้อมูล" : decimal(u.water_used_liters)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </>}
+    </section>
+  );
+}
+
 export default function AdminApp() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -558,6 +689,8 @@ export default function AdminApp() {
           <h2>เข้าสู่ระบบสำเร็จ</h2>
           <p>ผู้ใช้งาน: {user.username}</p>
           <p>สิทธิ์: {user.role}</p>
+
+          <DashboardPanel token={token} shops={shops} />
 
           <h3>เพิ่มร้านใหม่</h3>
           <form onSubmit={handleCreateShop}>
