@@ -689,10 +689,10 @@ void startMachine() {
 
   digitalWrite(D8, HIGH);
   Serial.println("TOUCH BTN POWER");
-  delayloop(800);
+  delayloop(600);
   digitalWrite(D8, LOW);
   Serial.println("POWER ON");
-  delayloop(1000);
+  delayloop(800);
 
   // Start the timeout only after the original touch sequence is complete.
   doorSampleReady = false;
@@ -778,44 +778,25 @@ void runProgram(int program) {
 
   Serial.println("Goto Cal");
 
-
   sendPattern(0);
-
-
   delayloop(2000);
-
-
   Serial.println("Goto Cal+1");
 
-
   sendPattern(1);
-
-
   delayloop(2000);
-
 
   // i = 2 เพราะ Goto Calibate+1 ไปแล้ว
 
   for (int i = 2; i <= program; i++) {
 
-
     Serial.print("Position ");
-
     Serial.println(i);
-
-
     sendPattern(i);
-
-
     delayloop(400);
-
-
     client.loop();
   }
 
-
-  delayloop(2000);
-
+  delayloop(1000);
 
   // ----------------------------------------------------
   // Temperature Pulse
@@ -824,10 +805,10 @@ void runProgram(int program) {
   for (int i = 0; i < tempPulse; i++) {
     digitalWrite(D7, HIGH);
     Serial.println("TEMP Pulse ON");
-    delayloop(800);
+    delayloop(600);
     digitalWrite(D7, LOW);
     Serial.println("TEMP Pulse OFF");
-    delayloop(1000);
+    delayloop(800);
   }
 
   delayloop(2000);
@@ -841,10 +822,10 @@ void runProgram(int program) {
 
     digitalWrite(D9, HIGH);
     Serial.println("AROMA Pulse ON");
-    delayloop(800);
+    delayloop(600);
     digitalWrite(D9, LOW);
     Serial.println("AROMA Pulse OFF");
-    delayloop(1000);
+    delayloop(800);
   }
 
   delayloop(2000);
@@ -862,34 +843,18 @@ void finishMachine() {
   waitingForDoorLock = false;
   doorFinishSent = true;
 
-
-
   Serial.println("Finish → OFF");
-
-
   digitalWrite(D8, HIGH);
-
-
   Serial.println("TOUCH BTN POWER");
-
+  delayloop(800);
+  digitalWrite(D8, LOW);
+  Serial.println("POWER OFF");
 
   delayloop(800);
 
-
-  digitalWrite(D8, LOW);
-
-
-  Serial.println("POWER OFF");
-
-
-  delayloop(1000);
-
-
   sendPattern(15);
 
-
   delayloop(2000);
-
 
   machineState = "FINISH";
 
