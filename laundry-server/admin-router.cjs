@@ -630,6 +630,62 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {})
   });
 
 
+
+  // Admin CLEAR: reset stale server state only; never publish MQTT commands.
+  router.patch("/shops/:shopId/machines/:machine/clear", requireAdmin, async (req, res) => {
+    const { shopId, machine } = req.params;
+    if (!/^machine\\d+$/.test(machine)) {
+      return res.status(400).json({ error: "Invalid machine" });
+    }
+
+    const writeDb = new sqlite3.Database(dbPath);
+    const run = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.run(sql, params, function (err) { err ? reject(err) : resolve(this); }));
+    const get = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.get(sql, params, (err, row) => err ? reject(err) : resolve(row)));
+    const close = () => new Promise(resolve => writeDb.close(() => resolve()));
+    let started = false;
+
+    try {
+      await run("PRAGMA busy_timeout = 10000");
+      await run("BEGIN IMMEDIATE");
+      started = true;
+      const row = await get(
+        `SELECT state, status, reserved_until, deleted_at
+         FROM machines WHERE machine = ? AND shop_id = ?`,
+        [machine, shopId]
+      );
+      if (!row || row.deleted_at != null) {
+        await run("ROLLBACK"); started = false;
+        return res.status(404).json({ error: "Machine not found" });
+      }
+      if (row.state === "RESERVED" && Number(row.reserved_until) > Date.now()) {
+        await run("ROLLBACK"); started = false;
+        return res.status(409).json({ error: "Machine has an active reservation" });
+      }
+      if (row.status === "ONLINE" && ["RUNNING", "STARTING"].includes(row.state)) {
+        await run("ROLLBACK"); started = false;
+        return res.status(409).json({ error: "Machine is online and may be operating" });
+      }
+      await run(
+        `UPDATE machines
+         SET state = 'IDLE', reserved_until = NULL, reservation_txid = NULL
+         WHERE machine = ? AND shop_id = ?`,
+        [machine, shopId]
+      );
+      await run("DELETE FROM machine_run_clock WHERE machine = ?", [machine]);
+      await run("COMMIT");
+      started = false;
+      return res.json({ success: true, machine, shop_id: shopId, state: "IDLE" });
+    } catch (err) {
+      if (started) { try { await run("ROLLBACK"); } catch (_) {} }
+      console.error("Admin CLEAR failed:", err);
+      return res.status(500).json({ error: "CLEAR failed" });
+    } finally {
+      await close();
+    }
+  });
+
   // Shop-specific pricing: read the effective catalog for a machine.
   router.get("/shops/:shopId/machines/:machine/pricing", requireAdmin, async (req, res) => {
     const { shopId, machine } = req.params;

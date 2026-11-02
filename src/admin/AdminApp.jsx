@@ -192,6 +192,38 @@ export default function AdminApp() {
     }
   }
 
+  const [clearingMachine, setClearingMachine] = useState(null);
+  const [clearMachineError, setClearMachineError] = useState("");
+
+  async function handleClearMachine(machine) {
+    if (!selectedShop || clearingMachine) return;
+    if (!window.confirm(
+      `CLEAR สถานะ ${machine.display_name || machine.machine} (${machine.machine}) ให้เป็น IDLE?\\n` +
+      "คำสั่งนี้แก้เฉพาะข้อมูลบน Server ไม่ได้หยุดเครื่องจริง"
+    )) return;
+
+    setClearingMachine(machine.machine);
+    setClearMachineError("");
+    try {
+      const response = await fetch(
+        `${API}/admin/shops/${encodeURIComponent(selectedShop.shop_id)}/machines/${encodeURIComponent(machine.machine)}/clear`,
+        { method: "PATCH", headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `CLEAR ไม่สำเร็จ (HTTP ${response.status})`);
+      setMachines(previous => previous.map(item =>
+        item.machine === machine.machine
+          ? { ...item, state: "IDLE", reserved_until: null, reservation_txid: null,
+              run_started_at: null, estimated_minutes: null }
+          : item
+      ));
+    } catch (err) {
+      setClearMachineError(err.message);
+    } finally {
+      setClearingMachine(null);
+    }
+  }
+
   const [updatingMachine, setUpdatingMachine] = useState(null);
   const [updateMachineError, setUpdateMachineError] = useState("");
 
@@ -691,6 +723,9 @@ export default function AdminApp() {
                     เครื่องที่ลบแล้ว ({machines.filter(m => m.deleted_at != null).length})
                   </button>
                 </div>
+                {clearMachineError && (
+                  <p role="alert" style={{ color: "red" }}>{clearMachineError}</p>
+                )}
                 {deleteMachineError && (
                   <p role="alert" style={{ color: "red" }}>{deleteMachineError}</p>
                 )}
@@ -741,6 +776,24 @@ export default function AdminApp() {
                           ? "ปิดใช้งาน"
                           : "เปิดใช้งาน"}
                     </button>
+                    {machine.deleted_at == null && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          disabled={
+                            clearingMachine !== null ||
+                            (machine.state === "RESERVED" &&
+                              Number(machine.reserved_until) > Date.now()) ||
+                            (machine.status === "ONLINE" &&
+                              ["RUNNING", "STARTING"].includes(machine.state))
+                          }
+                          onClick={() => handleClearMachine(machine)}
+                        >
+                          {clearingMachine === machine.machine ? "กำลัง CLEAR..." : "CLEAR"}
+                        </button>
+                      </>
+                    )}
                     {machine.deleted_at == null && (
                       <>
                         {" "}
