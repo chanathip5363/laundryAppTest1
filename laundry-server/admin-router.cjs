@@ -631,11 +631,14 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {},
 
 
 
-  // Admin CLEAR: reset stale server state only; never publish MQTT commands.
+  // Admin CLEAR: request ESP32 RESET via shop-scoped MQTT, then clear server state.
   router.patch("/shops/:shopId/machines/:machine/clear", requireAdmin, async (req, res) => {
     const { shopId, machine } = req.params;
-    if (!/^machine\d+$/.test(machine)) {
-      return res.status(400).json({ error: "Invalid machine" });
+    if (!/^shop[a-zA-Z0-9_-]{1,30}$/.test(shopId) || !/^machine\d+$/.test(machine)) {
+      return res.status(400).json({ error: "Invalid shop or machine" });
+    }
+    if (typeof sendMqttCommand !== "function") {
+      return res.status(503).json({ error: "MQTT command service unavailable" });
     }
 
     const writeDb = new sqlite3.Database(dbPath);
@@ -663,6 +666,9 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {},
         await run("ROLLBACK"); started = false;
         return res.status(409).json({ error: "Machine has an active reservation" });
       }
+      // MQTT QoS 1 acknowledges broker delivery, not ESP32 execution.
+      // Do not mark the server IDLE if publishing fails.
+      await sendMqttCommand(shopId, machine, { action: "reset" });
       await run(
         `UPDATE machines
          SET state = 'IDLE', reserved_until = NULL, reservation_txid = NULL

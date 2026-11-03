@@ -61,18 +61,10 @@ app.use("/admin", createAdminRouter("database.db", () => {
     );
   }
 }, async (shopId, machineId, command) => {
-  if (command.action !== "finish") {
+  if (!command || !["finish", "reset"].includes(command.action)) {
     throw new Error("Unsupported admin command");
   }
-
-  await new Promise((resolve, reject) => {
-    client.publish(
-      `laundry/${machineId}/finish`,
-      "1",
-      { qos: 1, retain: false },
-      (err) => err ? reject(err) : resolve()
-    );
-  });
+  await sendNewMqttCommand(shopId, machineId, command);
 }));
 
 const usedTx = new Set();
