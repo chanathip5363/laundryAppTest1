@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { getPaymentQrUrl } from "./utils/paymentQr";
 import mqttClient from "./mqtt/mqttClient";
 import { getTempPulse } from "./utils/getTempPulse";
@@ -53,7 +53,7 @@ function App() {
 
 
 const [step, setStep] = useState(1);
-const SHOW_TEST_BUTTONS = true;
+const SHOW_TEST_BUTTONS = false;
 const [mode, setMode] = useState(null);
 const [selectedMachine, setSelectedMachine] = useState(null);
 const [selectedMachineProfile, setSelectedMachineProfile] = useState(null);
@@ -567,26 +567,17 @@ const beginPayment = async () => {
     return data;
   };
 
-const finishWash = async (machine) => {
-  try {
-    const response = await fetch(
-      `https://api.the-oasis-living.com/machines/${machine}/finish`,
-      { method: "POST" }
-    );
+const finishWash = (machine) => {
+  if (!client) return;
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+  client.publish(`laundry/${machine}/finish`, "done");
 
-    console.log("Finish sent:", machine);
+  console.log("Finish pressed:", machine);
 
-    setStep(1);
-    setMode(null);
-  } catch (error) {
-    console.error("Finish failed:", error);
-    alert("ส่งคำสั่งซักเสร็จไม่สำเร็จ");
-  }
+  setStep(1);
+  setMode(null);
 };
+
 
 
 
@@ -1018,3 +1009,4 @@ return (
 }
 
 export default App;
+

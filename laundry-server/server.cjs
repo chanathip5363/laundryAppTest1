@@ -10,7 +10,7 @@ const { estimateMinutes } = require("./machine-time.cjs");
 const { createMqttManager } = require("./mqtt-manager.cjs");
 
 // MQTT ใหม่: ยังไม่เปิดใช้งาน
-const USE_NEW_MQTT = false; // Change only after the pilot is ready.
+const USE_NEW_MQTT = true; // Change only after the pilot is ready.
 
 const newMqtt = USE_NEW_MQTT
   ? createMqttManager({
@@ -60,7 +60,7 @@ app.use("/admin", createAdminRouter("database.db", () => {
       console.error("[MQTT NEW] Admin sync:", err.message)
     );
   }
-}));
+}, sendNewMqttCommand));
 
 const usedTx = new Set();
 app.use(bodyParser.json());

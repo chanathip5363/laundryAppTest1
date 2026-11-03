@@ -323,6 +323,33 @@ export default function AdminApp() {
     }
   }
 
+  const [finishingMachine, setFinishingMachine] = useState(null);
+  const [finishMachineError, setFinishMachineError] = useState("");
+
+  async function handleFinishMachine(machine) {
+    if (!selectedShop || finishingMachine || clearingMachine) return;
+    if (!window.confirm(
+      `จำลองเสร็จ ${machine.display_name || machine.machine} (${machine.machine})?`
+    )) return;
+
+    setFinishingMachine(machine.machine);
+    setFinishMachineError("");
+    try {
+      const response = await fetch(
+        `${API}/admin/shops/${encodeURIComponent(selectedShop.shop_id)}/machines/${encodeURIComponent(machine.machine)}/finish`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "จำลองเสร็จไม่สำเร็จ");
+      }
+    } catch (err) {
+      setFinishMachineError(err.message);
+    } finally {
+      setFinishingMachine(null);
+    }
+  }
+
   const [clearingMachine, setClearingMachine] = useState(null);
   const [clearMachineError, setClearMachineError] = useState("");
 
@@ -330,7 +357,7 @@ export default function AdminApp() {
     if (!selectedShop || clearingMachine) return;
     if (!window.confirm(
       `CLEAR สถานะ ${machine.display_name || machine.machine} (${machine.machine}) ให้เป็น IDLE?\\n` +
-      "คำสั่งนี้แก้เฉพาะข้อมูลบน Server ไม่ได้หยุดเครื่องจริง"
+      "คำสั่งนี้ส่ง RESET ไปยัง ESP32 และเคลียร์สถานะ Server"
     )) return;
 
     setClearingMachine(machine.machine);
@@ -857,6 +884,9 @@ export default function AdminApp() {
                     เครื่องที่ลบแล้ว ({machines.filter(m => m.deleted_at != null).length})
                   </button>
                 </div>
+                {finishMachineError && (
+                  <p role="alert" style={{ color: "red" }}>{finishMachineError}</p>
+                )}
                 {clearMachineError && (
                   <p role="alert" style={{ color: "red" }}>{clearMachineError}</p>
                 )}
@@ -915,8 +945,16 @@ export default function AdminApp() {
                         {" "}
                         <button
                           type="button"
+                          disabled={finishingMachine !== null || clearingMachine !== null}
+                          onClick={() => handleFinishMachine(machine)}
+                        >
+                          {finishingMachine === machine.machine ? "กำลังจำลอง..." : "จำลองเสร็จ"}
+                        </button>
+                        {" "}
+                        <button
+                          type="button"
                         disabled={
-                          clearingMachine !== null ||
+                          finishingMachine !== null || clearingMachine !== null ||
                           (machine.state === "RESERVED" &&
                             Number(machine.reserved_until) > Date.now())
                         }

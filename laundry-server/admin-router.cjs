@@ -5,7 +5,7 @@ const { verifyPassword } = require("./admin-auth.cjs");
 
 const SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
-function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {}) {
+function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {}, sendMqttCommand) {
   const router = express.Router();
   const allowedOrigins = new Set([
     "https://laundry-app-test1.vercel.app"
@@ -680,6 +680,33 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {})
     } finally {
       await close();
     }
+  });
+
+  // Admin-only simulation of the ESP32 finish command.
+  router.post("/shops/:shopId/machines/:machine/finish", requireAdmin, (req, res) => {
+    const { shopId, machine } = req.params;
+    if (!/^shop[a-zA-Z0-9_-]{1,30}$/.test(shopId) || !/^machine\d+$/.test(machine)) {
+      return res.status(400).json({ error: "Invalid shop or machine" });
+    }
+    if (typeof sendMqttCommand !== "function") {
+      return res.status(503).json({ error: "MQTT command service unavailable" });
+    }
+    db.get(
+      `SELECT machine FROM machines
+       WHERE shop_id = ? AND machine = ? AND deleted_at IS NULL`,
+      [shopId, machine],
+      async (err, row) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+        if (!row) return res.status(404).json({ error: "Machine not found in shop" });
+        try {
+          await sendMqttCommand(shopId, machine, { action: "finish" });
+          return res.json({ success: true, shop_id: shopId, machine });
+        } catch (error) {
+          console.error("Admin FINISH failed:", error);
+          return res.status(500).json({ error: "FINISH command failed" });
+        }
+      }
+    );
   });
 
   // Shop-specific pricing: read the effective catalog for a machine.
