@@ -155,7 +155,7 @@ function createMqttManager({
     client = null;
   }
 
-  return { connect, publishCommand, onMessage, close, syncSubscriptions };
+  return { connect, publishCommand, onMessage, close, syncSubscriptions, isConnected: () => Boolean(client && client.connected) };
 }
 
 module.exports = { createMqttManager, commandTopic, validateCommand };

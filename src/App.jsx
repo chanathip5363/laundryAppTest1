@@ -1,10 +1,7 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getPaymentQrUrl } from "./utils/paymentQr";
-import mqttClient from "./mqtt/mqttClient";
 import { getTempPulse } from "./utils/getTempPulse";
 import { getAromaPulse } from "./utils/getAromaPulse";
-import { MQTT_TOPICS } from "./constants/mqttTopics";
-import { setupMqttHandlers } from "./mqtt/mqttHandlers";
 import { calculateTotalPrice } from "./price/priceLogic";
 import { calculateDryTotalPrice } from "./price/dryPriceLogic";
 import ServiceSelection from "./components/ServiceSelection";
@@ -46,14 +43,12 @@ function App() {
   const shopId =
     new URLSearchParams(window.location.search).get("shop") || "shop001";
 
-  const [client, setClient] = useState(null);
   const [status, setStatus] = useState("Disconnected");
   const [program, setProgram] = useState(0);
   const [prices, setPrices] = useState({}); // 200369-02 เพิ่ม state เก็บราคา
 
 
 const [step, setStep] = useState(1);
-const SHOW_TEST_BUTTONS = false;
 const [mode, setMode] = useState(null);
 const [selectedMachine, setSelectedMachine] = useState(null);
 const [selectedMachineProfile, setSelectedMachineProfile] = useState(null);
@@ -341,36 +336,20 @@ const [aromaSelected, setAromaSelected] = useState(null);
 
 
 
+  // HTTPS API reachability indicator; no browser MQTT credentials or connection.
   useEffect(() => {
-
-    const mqtt = mqttClient;   
-    mqtt.on("connect", () => {
-      console.log("MQTT Connected");
-      setStatus("Connected");
-
-      mqtt.subscribe("laundry/+/state");
-      mqtt.subscribe("laundry/+/status");
-    });
-
-    mqtt.on("message", (topic, message) => {
-      const parts = topic.split("/");
-      const type = parts[2]?.toUpperCase();
-      console.log(`[${type}] ${parts[1]} = ${message.toString()}`);
-    });
-
-    mqtt.on("error", (err) => {
-      console.log("MQTT error:", err);
-    });
-
-    setClient(mqtt);
-
-    return () => {
-  // ไม่ต้องปิด mqttClient เพราะใช้ร่วมกันทั้งโปรแกรม
-};
-
-    // return () => {
-    //   mqtt.end();
-    // };
+    let active = true;
+    const check = async () => {
+      try {
+        const response = await fetch(`${PAYMENT_API}/machines`, { cache: "no-store" });
+        if (active) setStatus(response.ok ? "Connected" : "Disconnected");
+      } catch (_) {
+        if (active) setStatus("Disconnected");
+      }
+    };
+    check();
+    const timer = setInterval(check, 30000);
+    return () => { active = false; clearInterval(timer); };
   }, []);
 
   const buildPaymentSelection = () => {
@@ -567,22 +546,7 @@ const beginPayment = async () => {
     return data;
   };
 
-const finishWash = (machine) => {
-  if (!client) return;
-
-  client.publish(`laundry/${machine}/finish`, "done");
-
-  console.log("Finish pressed:", machine);
-
-  setStep(1);
-  setMode(null);
-};
-
-
-
-
-  
-
+// Test controls remain hidden; when enabled, use the existing authenticated Admin API.
 
 return (
   <div className="laundry-app">
@@ -642,46 +606,6 @@ return (
     />
 
 
-{SHOW_TEST_BUTTONS && (
-  <div className="test-controls">
-
-    <br />
-<button onClick={() => finishWash("machine1")}>
-  ซักเสร็จ เครื่อง 1
-</button>
-
-<button onClick={() => finishWash("machine2")}>
-  ซักเสร็จ เครื่อง 2
-</button>
-
-<button onClick={() => finishWash("machine3")}>
-  ซักเสร็จ เครื่อง 3
-</button>
-
-<button onClick={() => finishWash("machine4")}>
-  ซักเสร็จ เครื่อง 4
-</button>
-
-    <br />
-<button onClick={() => finishWash("machine5")}>
-  อบเสร็จ เครื่อง 1
-</button>
-
-
-<button onClick={() => finishWash("machine6")}>
-  อบเสร็จ เครื่อง 2
-</button>
-
-<button onClick={() => finishWash("machine7")}>
-  อบเสร็จ เครื่อง 3
-</button>
-
-<button onClick={() => finishWash("machine8")}>
-  อบเสร็จ เครื่อง 4
-</button>
-
-  </div>
-)}
 
   </>
 )}

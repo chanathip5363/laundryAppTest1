@@ -1,6 +1,5 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const mqtt = require("mqtt");
 const sqlite3 = require("sqlite3").verbose();
 
 const cors = require("cors")
@@ -70,21 +69,11 @@ app.use("/admin", createAdminRouter("database.db", () => {
 const usedTx = new Set();
 app.use(bodyParser.json());
 
-// ===== MQTT =====
-const client = mqtt.connect("mqtts://1f987687489a42f296be8b2579cd71f5.s1.eu.hivemq.cloud:8883",
-    {
-        username: "ESP32",
-        password: "Laundry123"
-    }
-);
-
-client.on("connect", () => {
-    console.log("MQTT connected");
-
-    client.subscribe("laundry/+/state");
-    client.subscribe("laundry/+/status");    
-    client.subscribe("laundry/+/telemetry");
-});
+// Single MQTT connection: Mosquitto managed by mqtt-manager.cjs.
+// Preserve the payment gate's existing `client.connected` contract.
+const client = {
+  get connected() { return Boolean(newMqtt && newMqtt.isConnected()); }
+};
 
 // ===== DATABASE =====
 const db = new sqlite3.Database("./database.db");
@@ -356,54 +345,11 @@ isMachineOnline(machine, (online) => {
       })
 };
 
-if (USE_NEW_MQTT) {
-  // MQTT ใหม่: ส่ง JSON
-  sendNewMqttCommand(machineRow.shop_id, machine, newCommand)
-    .catch((err) => {
-      console.error("[NEW MQTT] Command failed:", err.message);
-    });
-
-} else if (type === "dry") {
-  // MQTT เดิม: เครื่องอบ
-  client.publish(
-    `laundry/${machine}/temperatureOption`,
-    String(temperatureOption)
-  );
-
-  client.publish(
-    `laundry/${machine}/wrinkleOption`,
-    String(wrinkleOption)
-  );
-
-  client.publish(
-    `laundry/${machine}/program`,
-    program.toString()
-  );
-
-  console.log("DRY command:", {
-    machine,
-    program,
-    temperatureOption,
-    wrinkleOption
+// Send only through the new shop-scoped MQTT broker.
+sendNewMqttCommand(machineRow.shop_id, machine, newCommand)
+  .catch((err) => {
+    console.error("[NEW MQTT] Command failed:", err.message);
   });
-
-} else {
-  // MQTT เดิม: เครื่องซัก
-  client.publish(
-    `laundry/${machine}/tempPulse`,
-    String(tempPulse || 0)
-  );
-
-  client.publish(
-    `laundry/${machine}/aromaPulse`,
-    String(aromaPulse || 0)
-  );
-
-  client.publish(
-    `laundry/${machine}/program`,
-    program.toString()
-  );
-} 
           console.log("Start machine:", machine);
           return res.sendStatus(200);
         }
@@ -497,8 +443,6 @@ app.post("/request-qr", (req, res) => {
 });
 
 // ===== รับ status จาก ESP =====
-client.subscribe("laundry/+/state");
-
 function handleMachineMessage(topic, message) {
         // ===== บันทึกข้อมูลไฟฟ้าและน้ำจาก ESP32 =====
     const telemetryMatch = /^laundry\/([^/]+)\/telemetry$/.exec(topic);
@@ -849,13 +793,6 @@ db.run(
 }
 
 }
-
-// MQTT เดิมยังรับข้อความเหมือนเดิม
-client.on("message", (topic, message) => {
-  // Once pilot is enabled, ignore stale HiveMQ updates for machine1 only.
-  if (USE_NEW_MQTT && /^laundry\/machine\d+\/(state|status|telemetry)$/.test(topic)) return;
-  handleMachineMessage(topic, message);
-});
 
 // MQTT ใหม่: ตรวจสอบ shop_id ก่อนส่งสถานะเข้าระบบเดิม
 if (newMqtt) {
