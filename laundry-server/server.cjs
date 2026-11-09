@@ -265,8 +265,7 @@ isMachineOnline(machine, (online) => {
 
 
           // ===== USAGE START: บันทึกค่ามิเตอร์เมื่อชำระเงินสำเร็จ =====
-          if (machine === "machine1") {
-            db.get(
+          db.get(
               `SELECT energy_kwh, water_liters, received_at
                FROM machine_telemetry
                WHERE machine = ?
@@ -311,7 +310,6 @@ isMachineOnline(machine, (online) => {
                 );
               }
             );
-          }
           // ===== END USAGE START =====
 
           // 4. อัพเดทเครื่องเป็น STARTING
@@ -642,8 +640,7 @@ function calculateUsageEnergy(txid, machine) {
 // ===== END CALCULATED ENERGY =====
 
 // ===== USAGE FINISH START =====
-if (machine === "machine1") {
-  db.get(
+db.get(
     `SELECT txid, start_energy_kwh, start_water_liters
      FROM machine_usage
      WHERE machine=? AND status IN ('STARTED','MISSING_START')
@@ -718,7 +715,6 @@ if (machine === "machine1") {
       );
     }
   );
-}
 // ===== USAGE FINISH END =====
 
 
