@@ -111,7 +111,7 @@ function DashboardPanel({ token, shops }) {
             <tbody>{data.machines.map(m => <tr key={m.machine}>
               <td style={{ padding: 7 }}>{m.shop_id}</td><td>{m.display_name || m.machine} ({m.machine})</td>
               <td>{m.paid_orders}</td><td>{thb(m.revenue_satang)}</td><td>{m.usage_cycles}</td>
-              <td>{m.energy_samples ? decimal(m.energy_kwh) : "ไม่มีข้อมูล"}</td>
+              <td>{m.energy_samples ? decimal(m.energy_kwh, 3) : "ไม่มีข้อมูล"}</td>
               <td>{m.water_samples ? decimal(m.water_liters) : "ไม่มีข้อมูล"}</td><td>{m.estimated_cycles}</td>
             </tr>)}</tbody>
           </table>
