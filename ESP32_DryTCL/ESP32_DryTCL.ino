@@ -1,6 +1,10 @@
+// ESP32_DryTCL - MQTT dry-command simulation using independent Toshiba reference.
+// IMPORTANT: This is NOT a real TCL dryer control implementation.
+#include <PZEM004Tv30.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 #include <esp_task_wdt.h>  // การทำ watchdog ทำต้อจากเพิ่ม Heartbeat เพื่อป้องกัน ESP ค้าง
 #include <Preferences.h>   // การทำ ESP จำโปรแกรมล่าสุด เวลาไฟดับ ESP รีบูต ต่อจากการทำ state โดยใช้หน่วยความจำในตัวของ ESP32 NVS
 
@@ -22,13 +26,17 @@ const char* password2 = "Suppakamlang";
 // MQTT
 // ======================================================
 
-const char* mqtt_server = "1f987687489a42f296be8b2579cd71f5.s1.eu.hivemq.cloud";
+const char* mqtt_server = "api.the-oasis-living.com";
 const int mqtt_port = 8883;
 
-const char* mqtt_user = "ESP32";
-const char* mqtt_pass = "Laundry123";
+const char* mqtt_user = "shop001-machine1";
+const char* mqtt_pass = "Pok14111411!";
 
+// Change only these two IDs for another shop/machine.
+const char* SHOP_ID = "shop001";
 const char* MACHINE_ID = "machine5";
+String mqttBase() { return String("laundry/") + SHOP_ID + "/" + MACHINE_ID; }
+String mqttTopic(const char* suffix) { return mqttBase() + "/" + suffix; }
 
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
@@ -38,17 +46,72 @@ PubSubClient client(espClient);
 // PIN
 // ======================================================
 
+#define D0 4
+#define D1 13
+#define D2 25
+#define D3 26
+#define D4 27
+#define D7 23       // TEMP
+#define D8 18       // START
+#define D9 19       // AROMA
 #define DOOR_PIN 32
 #define BUZZER_PIN 33
-// TCL DRY CONTROL
-#define POWER_PIN        15
-#define ENCODER_A_PIN    16
-#define ENCODER_B_PIN    17
-#define TEMP_PIN         5
-#define ANTI_CREASE_PIN  19
-#define START_PIN        18
 
-bool lastState = HIGH;
+
+// PZEM-004T V3: ESP32 RX=16, TX=17 via 3.3V/5V level converter.
+PZEM004Tv30 pzem(Serial2, 16, 17);
+const unsigned long PZEM_INTERVAL_MS = 2000;
+unsigned long lastPzemRead = 0;
+void readPzem();
+
+// MQTT telemetry: send cached measurements every 10 seconds.
+const unsigned long TELEMETRY_INTERVAL_MS = 10000;
+unsigned long lastTelemetrySent = 0;
+bool pzemReadingValid = false;
+float pzemVoltage = 0;
+float pzemCurrent = 0;
+float pzemPower = 0;
+float pzemEnergyKwh = 0;
+void publishTelemetry();
+
+// Flow sensor: yellow -> spare HV channel, matching LV -> GPIO21.
+// Test total counts all water since ESP32 boot; no per-cycle reset or NVS yet.
+const uint8_t FLOW_PIN = 21;
+const double FLOW_PULSES_PER_LITER = 450.0;  // Calibrate with measured water.  FLOW_PULSES_PER_LITER = 450.0
+const unsigned long FLOW_INTERVAL_MS = 2000;
+portMUX_TYPE flowMux = portMUX_INITIALIZER_UNLOCKED;
+volatile uint32_t flowPulseCount = 0;
+// Reject falling edges closer than 2 ms (noise filter).
+volatile uint32_t lastFlowPulseUs = 0;
+const uint32_t FLOW_DEBOUNCE_US = 2000;
+uint32_t lastFlowPulseCount = 0;
+uint64_t flowTotalPulses = 0;
+unsigned long lastFlowRead = 0;
+void IRAM_ATTR onFlowPulse();
+void readFlow();
+
+// PC817: LOW = lock feedback present, HIGH = feedback absent.
+const unsigned long DOOR_LOCK_CONFIRM_MS = 500;
+const unsigned long DOOR_UNLOCK_CONFIRM_MS = 2000;
+const unsigned long DOOR_LOCK_TIMEOUT_MS = 30000;
+bool doorRawLocked = false;
+bool doorStableLocked = false;
+bool doorSampleReady = false;
+bool waitingForDoorLock = false;
+bool doorFinishSent = false;
+bool finishInProgress = false;  // Prevent repeated touch pulses during finish delays.
+unsigned long doorRawSince = 0;
+unsigned long doorWaitStarted = 0;
+
+// Explicit declarations also allow ordinary C++ syntax checks.
+void processBuzzer();
+void handleEvent(int count);
+void runProgram(int program);
+void startMachine();
+void finishMachine();
+void resetMachine();
+void processDoorLock();
+void setMachineState(const char* state);
 
 unsigned long lastStatus = 0; // 200469 เพิ่มอ่าน buuzer
 
@@ -68,8 +131,35 @@ Preferences prefs;  // การทำ ESP จำโปรแกรมล่า�
 
 int program = 0;
 
-String temperatureOption = "normal";
-bool wrinkleOption = false;
+
+// ======================================================
+// SELECTOR PATTERN
+// ======================================================
+
+byte pattern[16][5] = {
+
+  {0,0,1,0,0}, // 8 - 0
+  {0,0,1,0,1}, // 9 - 1
+  {1,0,1,0,1}, // 10 - 2
+  {1,0,1,0,0}, // 11 - 3
+  {1,0,1,1,0}, // 12 - 4
+  {1,0,1,1,1}, // 13 - 5
+  {0,0,1,1,1}, // 14 - 6
+  {0,0,1,1,0}, // 15 - 7
+  {0,1,1,1,1}, // 1 - 9 - 8
+  {1,1,1,1,1}, // 2 - 10 - 9
+  {1,1,1,1,0}, // 3 - 11 - 10
+  {1,1,1,0,0}, // 4 - 12 - 11
+  {1,1,1,0,1}, // 5 - 13 - 12
+  {0,1,1,0,1}, // 6 - 14 - 13
+  {0,1,1,0,0}, // 7 - 15 - 14
+  {0,1,1,1,0}  // 0 - 8 -15 OFF
+
+};
+
+int aromaPulse;
+int tempPulse;
+
 
 // ======================================================
 // DELAY LOOP
@@ -84,6 +174,7 @@ void delayloop(unsigned long waitTime) {
     client.loop();
 
     processBuzzer();   // 260569 ⭐ เพิ่มบรรทัดนี้
+    processDoorLock();
 
     esp_task_wdt_reset();
 
@@ -91,69 +182,78 @@ void delayloop(unsigned long waitTime) {
   }
 }
 
+
+// ======================================================
+// SEND PATTERN
+// ======================================================
+
+void sendPattern(int pos) {
+
+  digitalWrite(D0, pattern[pos][0]);
+  digitalWrite(D1, pattern[pos][1]);
+  digitalWrite(D2, pattern[pos][2]);
+  digitalWrite(D3, pattern[pos][3]);
+  digitalWrite(D4, pattern[pos][4]);
+}
+
+
 // ======================================================
 // MQTT CALLBACK
 // ======================================================
 
 void callback(char* topic, byte* payload, unsigned int length) {
-
-  String msg;
-
-  for (int i = 0; i < length; i++) {
-    msg += (char)payload[i];
+  if (String(topic) != mqttTopic("cmd")) return;
+  if (length == 0 || length > 1024) {
+    Serial.println("[MQTT] Invalid command length");
+    return;
   }
 
-  String t = String(topic);
+  StaticJsonDocument<1024> doc;
+  DeserializationError err = deserializeJson(doc, payload, length);
+  if (err || !doc.is<JsonObject>()) {
+    Serial.println("[MQTT] Invalid command JSON");
+    return;
+  }
 
-
-if (t == String("laundry/") + MACHINE_ID + "/temperatureOption") {
-
-  temperatureOption = msg;
-
-  Serial.println(
-    "TEMPERATURE OPTION = " + temperatureOption
-  );
-}
-
-
-if (t == String("laundry/") + MACHINE_ID + "/wrinkleOption") {
-
-  wrinkleOption = (msg == "true");
-
-  Serial.println(
-    String("WRINKLE OPTION = ") +
-    (wrinkleOption ? "true" : "false")
-  );
-}
-
-
-if (t == String("laundry/") + MACHINE_ID + "/program") {
-
-  program = msg.toInt();
-
-  Serial.println("PROGRAM = " + String(program));
-  Serial.println(
-    "TEMPERATURE = " + temperatureOption
-  );
-  Serial.println(
-    String("WRINKLE = ") +
-    (wrinkleOption ? "true" : "false")
-  );
-
-  runProgram(program);
-}
-
-
-  if (t == String("laundry/") + MACHINE_ID + "/finish") {
-
+  const char* action = doc["action"] | "";
+  const char* type = doc["type"] | "";
+  if (strcmp(action, "finish") == 0 || strcmp(type, "finish") == 0) {
     finishMachine();
+    return;
   }
-
-
-  if (t == String("laundry/") + MACHINE_ID + "/reset") {
-
+  if (strcmp(action, "reset") == 0 || strcmp(type, "reset") == 0) {
     resetMachine();
+    return;
   }
+  // DRY SIMULATION ONLY: keep Toshiba hardware sequence for testing.
+  // The temperature/wrinkle selections are accepted and logged, but do not
+  // drive actual dryer controls. Never install on a real dryer as-is.
+  if (strcmp(type, "dry") == 0) {
+    if (machineState != "IDLE") {
+      Serial.println("[MQTT] Ignored dry command: machine not IDLE");
+      return;
+    }
+    if (!doc.containsKey("temperatureOption") || !doc.containsKey("wrinkleOption")) {
+      Serial.println("[MQTT] Missing dry options");
+      return;
+    }
+    String dryTemperature = doc["temperatureOption"].as<String>();
+    String dryWrinkle = doc["wrinkleOption"].as<String>();
+    if (dryTemperature.length() == 0 || dryWrinkle.length() == 0 ||
+        dryTemperature.length() > 32 || dryWrinkle.length() > 32) {
+      Serial.println("[MQTT] Invalid dry options");
+      return;
+    }
+    Serial.printf("[MQTT] DRY SIMULATION temperature=%s wrinkle=%s\n",
+                  dryTemperature.c_str(), dryWrinkle.c_str());
+    // Toshiba selector simulation; no real dryer temperature/wrinkle action.
+    program = 2;
+    tempPulse = 0;
+    aromaPulse = 0;
+    runProgram(program);
+    return;
+  }
+  Serial.println("[MQTT] Unsupported command type (expected dry)");
 }
 
 
@@ -178,6 +278,37 @@ void IRAM_ATTR onPulse() {
   buzzerActive = true;
 }
 
+
+// Count one falling edge per pulse. Keep this ISR independent of the buzzer.
+void IRAM_ATTR onFlowPulse() {
+  uint32_t nowUs = micros();
+  portENTER_CRITICAL_ISR(&flowMux);
+  if ((uint32_t)(nowUs - lastFlowPulseUs) >= FLOW_DEBOUNCE_US) {
+    flowPulseCount++;
+    lastFlowPulseUs = nowUs;
+  }
+  portEXIT_CRITICAL_ISR(&flowMux);
+}
+
+void readFlow() {
+  unsigned long now = millis();
+  unsigned long elapsed = now - lastFlowRead;
+  if (elapsed < FLOW_INTERVAL_MS) return;
+
+  portENTER_CRITICAL(&flowMux);
+  uint32_t pulses = flowPulseCount;
+  portEXIT_CRITICAL(&flowMux);
+
+  uint32_t delta = pulses - lastFlowPulseCount;
+  lastFlowPulseCount = pulses;
+  lastFlowRead = now;
+  flowTotalPulses += delta;
+
+  double liters = (double)flowTotalPulses / FLOW_PULSES_PER_LITER;
+  double rate = ((double)delta / FLOW_PULSES_PER_LITER) * 60000.0 / elapsed;
+  Serial.printf("[FLOW] Rate: %.2f L/min | Total: %.3f L | Pulses: %llu\n",
+                rate, liters, (unsigned long long)flowTotalPulses);
+}
 
 // ======================================================
 // PROCESS BUZZER
@@ -380,28 +511,41 @@ void setup() {
 
 
   String previousState = machineState;
+  if (previousState == "RUNNING" || previousState == "STARTING") {
+    machineState = "UNKNOWN";
+  }
 
 
   // ----------------------------------------------------
   // PIN MODE
   // ----------------------------------------------------
 
-  // TCL DRY CONTROL
-  pinMode(POWER_PIN, OUTPUT);
-  pinMode(ENCODER_A_PIN, OUTPUT);
-  pinMode(ENCODER_B_PIN, OUTPUT);
-  pinMode(TEMP_PIN, OUTPUT);
-  pinMode(ANTI_CREASE_PIN, OUTPUT);
-  pinMode(START_PIN, OUTPUT);
+  pinMode(D0, OUTPUT);
 
-  digitalWrite(POWER_PIN, LOW);
-  digitalWrite(ENCODER_A_PIN, LOW);
-  digitalWrite(ENCODER_B_PIN, LOW);
-  digitalWrite(TEMP_PIN, LOW);
-  digitalWrite(ANTI_CREASE_PIN, LOW);
-  digitalWrite(START_PIN, LOW);
+  pinMode(D1, OUTPUT);
+
+  pinMode(D2, OUTPUT);
+
+  pinMode(D3, OUTPUT);
+
+  pinMode(D4, OUTPUT);
+
+  pinMode(D7, OUTPUT);  // ปล่อย TEMP โดยไม่เปิด pull-up/down  pinMode(D7, OUTPUT);
+  digitalWrite(D7, LOW);
+
+  pinMode(D8, OUTPUT);  // ปล่อย TEMP โดยไม่เปิด pull-up/downpinMode(D8, OUTPUT);
+  digitalWrite(D8, LOW);
+
+  pinMode(D9, OUTPUT); // ปล่อย TEMP โดยไม่เปิด pull-up/down pinMode(D9, OUTPUT);
+  digitalWrite(D9, LOW);
 
   pinMode(DOOR_PIN, INPUT_PULLUP);
+
+  // The level converter supplies the pull-up on the 3.3 V side.
+  pinMode(FLOW_PIN, INPUT);
+  lastFlowRead = millis();
+  attachInterrupt(digitalPinToInterrupt(FLOW_PIN), onFlowPulse, FALLING);
+  Serial.println("[FLOW] GPIO21 ready; test total starts at boot (450 pulses/L)");
 
   pinMode(BUZZER_PIN, INPUT_PULLUP);
 
@@ -455,13 +599,11 @@ void setup() {
 
 
     String clientID =
-      String("Laundry") + MACHINE_ID;
+      String("Laundry_") + SHOP_ID + "_" + MACHINE_ID;
 
 
     String statusTopic =
-      String("laundry/") +
-      MACHINE_ID +
-      "/status";
+      mqttTopic("status");
 
 
     if (
@@ -480,11 +622,6 @@ void setup() {
       Serial.println("MQTT Connected");
 
 
-      client.publish(
-        "test/topic",
-        "ESP32 connected"
-      );
-
 
       client.publish(
         statusTopic.c_str(),
@@ -493,143 +630,52 @@ void setup() {
       );
 
 
-// -------------------------------------------------
-// TCL Selector Recovery
-// -------------------------------------------------
+      // -------------------------------------------------
+      // Selector recovery
+      // -------------------------------------------------
 
-bool selectorMoving =
-  prefs.getBool(
-    "selectorMoving",
-    false
-  );
+      bool selectorMoving =
+        prefs.getBool(
+          "selectorMoving",
+          false
+        );
 
-if (selectorMoving) {
 
-  Serial.println(
-    "TCL selector recovery skipped"
-  );
+      if (selectorMoving && previousState != "RUNNING" && previousState != "STARTING") {
 
-  // ป้องกันการสั่ง POWER / PROGRAM / START ซ้ำหลัง reboot
-  prefs.putBool(
-    "selectorMoving",
-    false
-  );
-}
+        Serial.println(
+          "Recovery selector position"
+        );
+
+        sendPattern(15);
+
+        delayloop(2000);
+
+        runProgram(program);
+      }
 
 
       // -------------------------------------------------
       // State Recovery
       // -------------------------------------------------
 
-      if (previousState == "RUNNING") {
-
-
-        Serial.println(
-          "Was RUNNING before power loss"
-        );
-
-
-        String stateTopic =
-          String("laundry/") +
-          MACHINE_ID +
-          "/state";
-
-
-        client.publish(
-          stateTopic.c_str(),
-          "UNKNOWN"
-        );
-
-
+      if (previousState == "RUNNING" || previousState == "STARTING") {
+        Serial.println("[RECOVERY] Waiting for actual door lock feedback");
+        waitingForDoorLock = true;
+        doorFinishSent = false;
+        doorSampleReady = false;
+        doorStableLocked = false;
+        doorWaitStarted = millis();
+        setMachineState("UNKNOWN");
       } else {
-
-
-        String stateTopic2 =
-          String("laundry/") +
-          MACHINE_ID +
-          "/state";
-
-
-        client.publish(
-          stateTopic2.c_str(),
-          machineState.c_str()
-        );
+        String stateTopic = mqttTopic("state");
+        client.publish(stateTopic.c_str(), machineState.c_str(), true);
       }
 
 
-      if (state == "RUNNING") {
-
-
-        Serial.println(
-          "Recovering program..."
-        );
-
-
-        String stateTopic3 =
-          String("laundry/") +
-          MACHINE_ID +
-          "/state";
-
-
-        client.publish(
-          stateTopic3.c_str(),
-          "RUNNING"
-        );
-      }
-
-
-      // -------------------------------------------------
-      // MQTT Subscribe
-      // -------------------------------------------------
-
-      String programTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/program";
-
-
-      String finishTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/finish";
-
-
-      String resetTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/reset";
-
-
-      String wrinkleTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/wrinkleOption";
-
-
-      String temperatureTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/temperatureOption";
-
-
-      client.subscribe(
-        programTopic.c_str()
-      );
-
-
-      client.subscribe(
-        finishTopic.c_str()
-      );
-
-
-      client.subscribe(
-        resetTopic.c_str()
-      );
-
-
-      client.subscribe(wrinkleTopic.c_str());
-
-      client.subscribe(temperatureTopic.c_str());
+      // Subscribe to the single JSON command topic.
+      String commandTopic = mqttTopic("cmd");
+      client.subscribe(commandTopic.c_str());
 
     } else {
 
@@ -650,271 +696,79 @@ if (selectorMoving) {
 // ======================================================
 
 void startMachine() {
-  Serial.println("TCL START");
+  // Save STARTING before issuing the touch pulse; RUNNING needs lock feedback.
+  waitingForDoorLock = false;
+  doorFinishSent = false;
+  doorSampleReady = false;
+  doorStableLocked = false;
+  setMachineState("STARTING");
+  prefs.putInt("program", program);
+  prefs.putBool("selectorMoving", false);
 
-  digitalWrite(START_PIN, HIGH);
-  Serial.println("START Pulse ON");
+  digitalWrite(D8, HIGH);
+  Serial.println("TOUCH BTN POWER");
+  delayloop(600);
+  digitalWrite(D8, LOW);
+  Serial.println("POWER ON");
   delayloop(800);
 
-  digitalWrite(START_PIN, LOW);
-  Serial.println("START Pulse OFF");
-  delayloop(1000);
-
-  Serial.println("TCL START PRESSED");
-
-  machineState = "RUNNING";
-
-
-  String stateTopic4 =
-    String("laundry/") +
-    MACHINE_ID +
-    "/state";
-
-
-  client.publish(
-    stateTopic4.c_str(),
-    "RUNNING"
-  );
-
-
-  Serial.println("[STATE] RUNNING");
-
-
-  prefs.putString(
-    "state",
-    "RUNNING"
-  );
-
-
-  prefs.putInt(
-    "program",
-    program
-  );
-
-
-  Serial.println("Machine Start");
-
-
-  prefs.putBool(
-    "selectorMoving",
-    false
-  );
+  // Start the timeout only after the original touch sequence is complete.
+  doorSampleReady = false;
+  doorWaitStarted = millis();
+  waitingForDoorLock = (machineState == "STARTING");
+  Serial.println("[DOOR] Waiting for lock (GPIO32 LOW)");
 }
 
 // ======================================================
-// TCL DRY - POWER ON
+// DOOR LOCK FEEDBACK
 // ======================================================
 
-void powerOnDryer() {
-  Serial.println("TCL POWER ON");
-
-  digitalWrite(POWER_PIN, HIGH);
-  Serial.println("POWER Pulse ON");
-  delayloop(800);
-
-  digitalWrite(POWER_PIN, LOW);
-  Serial.println("POWER Pulse OFF");
-  delayloop(2000);
-
-  Serial.println("TCL READY - PROGRAM 1");
+void setMachineState(const char* state) {
+  machineState = state;
+  prefs.putString("state", state);
+  String topic = mqttTopic("state");
+  client.publish(topic.c_str(), state, true);
+  Serial.print("[STATE] ");
+  Serial.println(state);
 }
 
-// ======================================================
-// TCL DRY - ROTARY RIGHT 1 STEP
-// A -> B
-// ======================================================
+void processDoorLock() {
+  unsigned long now = millis();
+  bool locked = (digitalRead(DOOR_PIN) == LOW);
+  if (!doorSampleReady || locked != doorRawLocked) {
+    doorSampleReady = true;
+    doorRawLocked = locked;
+    doorRawSince = now;
+  }
 
-void stepRight() {
-  Serial.println("ROTARY RIGHT START");
+  unsigned long confirmTime = locked ? DOOR_LOCK_CONFIRM_MS : DOOR_UNLOCK_CONFIRM_MS;
+  if (now - doorRawSince >= confirmTime && doorStableLocked != locked) {
+    doorStableLocked = locked;
+    Serial.println(locked ? "[DOOR] LOCKED" : "[DOOR] UNLOCKED");
 
-  digitalWrite(ENCODER_A_PIN, HIGH);
-  digitalWrite(ENCODER_B_PIN, LOW);
-  Serial.println("A=HIGH B=LOW");
-  delayloop(500);
+  }
 
-  digitalWrite(ENCODER_A_PIN, HIGH);
-  digitalWrite(ENCODER_B_PIN, HIGH);
-  Serial.println("A=HIGH B=HIGH");
-  delayloop(500);
-
-  digitalWrite(ENCODER_A_PIN, LOW);
-  digitalWrite(ENCODER_B_PIN, HIGH);
-  Serial.println("A=LOW  B=HIGH");
-  delayloop(500);
-
-  digitalWrite(ENCODER_A_PIN, LOW);
-  digitalWrite(ENCODER_B_PIN, LOW);
-  Serial.println("A=LOW  B=LOW");
-  delayloop(500);
-
-  Serial.println("ROTARY RIGHT DONE");
-}
-
-
-// ======================================================
-// TCL DRY - ROTARY LEFT 1 STEP
-// B -> A
-// ======================================================
-
-void stepLeft() {
-  Serial.println("ROTARY LEFT START");
-
-  digitalWrite(ENCODER_A_PIN, LOW);
-  digitalWrite(ENCODER_B_PIN, HIGH);
-  Serial.println("A=LOW  B=HIGH");
-  delayloop(500);
-
-  digitalWrite(ENCODER_A_PIN, HIGH);
-  digitalWrite(ENCODER_B_PIN, HIGH);
-  Serial.println("A=HIGH B=HIGH");
-  delayloop(500);
-
-  digitalWrite(ENCODER_A_PIN, HIGH);
-  digitalWrite(ENCODER_B_PIN, LOW);
-  Serial.println("A=HIGH B=LOW");
-  delayloop(500);
-
-  digitalWrite(ENCODER_A_PIN, LOW);
-  digitalWrite(ENCODER_B_PIN, LOW);
-  Serial.println("A=LOW  B=LOW");
-  delayloop(500);
-
-  Serial.println("ROTARY LEFT DONE");
-}
-
-// ======================================================
-// TCL DRY - SELECT PROGRAM
-// Start position = Program 1
-// ======================================================
-
-void selectProgram(int targetProgram) {
-
-  Serial.print("SELECT PROGRAM = ");
-  Serial.println(targetProgram);
-
-  // ป้องกันค่าผิด
-  if (targetProgram < 1 || targetProgram > 12) {
-    Serial.println("INVALID PROGRAM");
+  // Finish locally after a confirmed unlock; no MQTT command round trip.
+  // Only RUNNING can auto-finish, so an unlocked door at idle/start is ignored.
+  if (!locked && !doorStableLocked && now - doorRawSince >= DOOR_UNLOCK_CONFIRM_MS &&
+      machineState == "RUNNING" && !doorFinishSent && !finishInProgress) {
+    doorFinishSent = true;
+    Serial.println("FINISH DOOR UNLOCK (stable 2 seconds)");
+    finishMachine();
     return;
   }
 
-  // Program 1 = ตำแหน่งเริ่มต้น ไม่ต้องขยับ
-  if (targetProgram == 1) {
-    Serial.println("PROGRAM 1 - NO MOVE");
-    return;
-  }
-
-  // Program 2-6 = ไปทางซ้าย B -> A
-  if (targetProgram >= 2 && targetProgram <= 6) {
-
-    int steps = targetProgram - 1;
-
-    Serial.print("MOVE LEFT STEPS = ");
-    Serial.println(steps);
-
-    for (int i = 0; i < steps; i++) {
-      stepLeft();
-    }
-
-    return;
-  }
-
-  // Program 7-12 = ไปทางขวา A -> B
-  if (targetProgram >= 7 && targetProgram <= 12) {
-
-    int steps = targetProgram - 6;
-
-    Serial.print("MOVE RIGHT STEPS = ");
-    Serial.println(steps);
-
-    for (int i = 0; i < steps; i++) {
-      stepRight();
-    }
+  if (waitingForDoorLock && locked && doorStableLocked) {
+    waitingForDoorLock = false;
+    setMachineState("RUNNING");
+    Serial.println("Machine Start confirmed by Door Lock");
+  } else if (waitingForDoorLock && now - doorWaitStarted >= DOOR_LOCK_TIMEOUT_MS) {
+    waitingForDoorLock = false;
+    setMachineState("ERROR");
+    Serial.println("[DOOR] Lock not confirmed within 30 seconds; inspect door and retry after reset");
   }
 }
 
-// ======================================================
-// TCL DRY - TEMPERATURE
-// Default = Normal Dry
-//
-// Airing     : 2 presses
-// Normal Dry : 0 press
-// Extra Dry  : 1 press
-//
-// Program 8-12 cannot change temperature
-// ======================================================
-
-void pressTempButton() {
-  digitalWrite(TEMP_PIN, HIGH);
-  Serial.println("TEMP Pulse ON");
-  delayloop(800);
-
-  digitalWrite(TEMP_PIN, LOW);
-  Serial.println("TEMP Pulse OFF");
-  delayloop(1000);
-}
-
-void setTemperature(int targetProgram, String option) {
-
-  // Program 8-12 ไม่สามารถปรับอุณหภูมิได้
-  if (targetProgram >= 8 && targetProgram <= 12) {
-    Serial.println("TEMP LOCKED FOR PROGRAM 8-12");
-    return;
-  }
-
-  Serial.print("TEMPERATURE OPTION = ");
-  Serial.println(option);
-
-  // ค่าเริ่มต้นของเครื่อง = Normal Dry
-  if (option == "normal") {
-    Serial.println("NORMAL DRY - NO PRESS");
-    return;
-  }
-
-  // Normal -> Extra
-  if (option == "extra") {
-    pressTempButton();
-    return;
-  }
-
-  // Normal -> Extra -> Airing
-  if (option == "airing") {
-    pressTempButton();
-    pressTempButton();
-    return;
-  }
-
-  Serial.println("INVALID TEMPERATURE OPTION");
-}
-
-// ======================================================
-// TCL DRY - ANTI CREASE
-// Default = OFF
-//
-// false : no press
-// true  : press 1 time
-// Available for Program 1-12
-// ======================================================
-
-void setAntiCrease(bool enabled) {
-  Serial.print("ANTI CREASE = ");
-  Serial.println(enabled ? "ON" : "OFF");
-
-  if (!enabled) {
-    Serial.println("ANTI CREASE OFF - NO PULSE");
-    return;
-  }
-
-  digitalWrite(ANTI_CREASE_PIN, HIGH);
-  Serial.println("ANTI CREASE Pulse ON");
-  delayloop(800);
-
-  digitalWrite(ANTI_CREASE_PIN, LOW);
-  Serial.println("ANTI CREASE Pulse OFF");
-  delayloop(1000);
-
-  Serial.println("ANTI CREASE ON");
-}
 
 // ======================================================
 // RUN PROGRAM
@@ -922,55 +776,74 @@ void setAntiCrease(bool enabled) {
 
 void runProgram(int program) {
 
-  // ตรวจสอบหมายเลขโปรแกรมก่อนสั่งเครื่อง
-  if (program < 1 || program > 12) {
-    Serial.println("INVALID TCL PROGRAM");
-    return;
-  }
 
-  // บันทึกโปรแกรม
   prefs.putInt(
     "program",
     program
   );
 
-  // กำลังอยู่ในขั้นตอนตั้งค่าเครื่อง
+
   prefs.putBool(
     "selectorMoving",
     true
   );
 
-  Serial.println("====================");
-  Serial.println("TCL DRY START SEQUENCE");
-  Serial.print("PROGRAM = ");
-  Serial.println(program);
-  Serial.print("TEMPERATURE = ");
-  Serial.println(temperatureOption);
-  Serial.print("WRINKLE = ");
-  Serial.println(
-    wrinkleOption ? "true" : "false"
-  );
-  Serial.println("====================");
 
-  // 1. เปิดเครื่อง
-  powerOnDryer();
+  Serial.println("Goto Cal");
 
-  // 2. เลือกโปรแกรมจากตำแหน่งเริ่มต้น Program 1
-  selectProgram(program);
+  sendPattern(0);
+  delayloop(2000);
+  Serial.println("Goto Cal+1");
 
-  // 3. ตั้งอุณหภูมิ
-  // Program 8-12 จะถูกข้ามภายใน setTemperature()
-  setTemperature(
-    program,
-    temperatureOption
-  );
+  sendPattern(1);
+  delayloop(2000);
 
-  // 4. ตั้ง Anti-Crease
-  setAntiCrease(
-    wrinkleOption
-  );
+  // i = 2 เพราะ Goto Calibate+1 ไปแล้ว
 
-  // 5. กด START และเปลี่ยนสถานะเป็น RUNNING
+  for (int i = 2; i <= program; i++) {
+
+    Serial.print("Position ");
+    Serial.println(i);
+    sendPattern(i);
+    delayloop(400);
+    client.loop();
+  }
+
+  delayloop(1000);
+
+  // ----------------------------------------------------
+  // Temperature Pulse
+  // ----------------------------------------------------
+
+  for (int i = 0; i < tempPulse; i++) {
+    digitalWrite(D7, HIGH);
+    Serial.println("TEMP Pulse ON");
+    delayloop(600);
+    digitalWrite(D7, LOW);
+    Serial.println("TEMP Pulse OFF");
+    delayloop(800);
+  }
+
+  delayloop(2000);
+
+
+  // ----------------------------------------------------
+  // Aroma Pulse
+  // ----------------------------------------------------
+
+  for (int i = 0; i < aromaPulse; i++) {
+
+    digitalWrite(D9, HIGH);
+    Serial.println("AROMA Pulse ON");
+    delayloop(600);
+    digitalWrite(D9, LOW);
+    Serial.println("AROMA Pulse OFF");
+    delayloop(800);
+  }
+
+  delayloop(2000);
+
+
   startMachine();
 }
 
@@ -980,13 +853,33 @@ void runProgram(int program) {
 // ======================================================
 
 void finishMachine() {
+  // delayloop() also services MQTT and the door input. Ignore duplicate finish
+  // commands while finishing, and delayed commands after returning to IDLE.
+  if (finishInProgress || machineState == "IDLE" || machineState == "FINISH") {
+    return;
+  }
+  finishInProgress = true;
+  waitingForDoorLock = false;
+  doorFinishSent = true;
+
+  Serial.println("Finish → OFF");
+  digitalWrite(D8, HIGH);
+  Serial.println("TOUCH BTN POWER");
+  delayloop(800);
+  digitalWrite(D8, LOW);
+  Serial.println("POWER OFF");
+
+  delayloop(800);
+
+  sendPattern(15);
+
+  delayloop(2000);
 
   machineState = "FINISH";
 
+
   String stateTopic5 =
-    String("laundry/") +
-    MACHINE_ID +
-    "/state";
+    mqttTopic("state");
 
 
   client.publish(
@@ -1008,6 +901,7 @@ void finishMachine() {
 
 
   resetMachine();
+  finishInProgress = false;
 }
 
 
@@ -1025,13 +919,10 @@ void reconnect() {
 
 
       String clientID =
-        String("Laundry") +
-        MACHINE_ID;
+        String("Laundry_") + SHOP_ID + "_" + MACHINE_ID;
 
       String statusTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/status";
+        mqttTopic("status");
 
       if (
         client.connect(
@@ -1047,49 +938,11 @@ void reconnect() {
 
       Serial.println("[MQTT] Reconnected OK");
 
-      String programTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/program";
-
-
-      String finishTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/finish";
-
-
-      String resetTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/reset";
-
-      String wrinkleTopic = String("laundry/") + MACHINE_ID + "/wrinkleOption";
-
-      String temperatureTopic = String("laundry/") + MACHINE_ID + "/temperatureOption";
-
-
-      client.subscribe(
-        programTopic.c_str()
-      );
-
-
-      client.subscribe(
-        finishTopic.c_str()
-      );
-
-
-      client.subscribe(
-        resetTopic.c_str()
-      );
-
-      client.subscribe(
-        wrinkleTopic.c_str()
-      );
-
-      client.subscribe(
-        temperatureTopic.c_str()
-      );
+      String commandTopic = mqttTopic("cmd");
+      client.subscribe(commandTopic.c_str());
+      client.publish(statusTopic.c_str(), "ONLINE", true);
+      String stateTopic = mqttTopic("state");
+      client.publish(stateTopic.c_str(), machineState.c_str(), true);
 
     } else {
 
@@ -1141,18 +994,22 @@ void checkWiFi() {
 // ======================================================
 
 void resetMachine() {
+  waitingForDoorLock = false;
+  doorFinishSent = false;
+
 
 
   Serial.println("Reset Machine -> IDLE");
+
+
+  sendPattern(15);
 
 
   machineState = "IDLE";
 
 
   String stateTopic6 =
-    String("laundry/") +
-    MACHINE_ID +
-    "/state";
+    mqttTopic("state");
 
 
   client.publish(
@@ -1242,6 +1099,80 @@ void handleEvent(int count) {
 // LOOP
 // ======================================================
 
+// Read outside delayloop() to preserve touch pulse timing.
+// Energy total belongs to the PZEM; this does not reset or store it.
+void readPzem() {
+  if (millis() - lastPzemRead < PZEM_INTERVAL_MS) return;
+  lastPzemRead = millis();
+
+  esp_task_wdt_reset();
+  float voltage = pzem.voltage();
+  float current = pzem.current();
+  float power = pzem.power();
+  float energy = pzem.energy();
+  esp_task_wdt_reset();
+
+  if (isnan(voltage) || isnan(current) ||
+      isnan(power) || isnan(energy)) {
+    pzemReadingValid = false;
+    Serial.println("[PZEM] Cannot read PZEM");
+    return;
+  }
+
+  pzemVoltage = voltage;
+  pzemCurrent = current;
+  pzemPower = power;
+  pzemEnergyKwh = energy;
+  pzemReadingValid = true;
+
+  Serial.printf("[PZEM] Voltage : %.1f V\n", voltage);
+  Serial.printf("[PZEM] Current : %.3f A\n", current);
+  Serial.printf("[PZEM] Power   : %.1f W\n", power);
+  Serial.printf("[PZEM] Energy total : %.3f kWh\n", energy);
+}
+
+// Publish only when connected. Missing PZEM readings are sent as JSON null,
+// never as an invented zero. Water is cumulative since ESP32 boot.
+void publishTelemetry() {
+  unsigned long now = millis();
+  if (now - lastTelemetrySent < TELEMETRY_INTERVAL_MS) return;
+  if (!client.connected()) return;
+
+  lastTelemetrySent = now;
+  double waterLiters = (double)flowTotalPulses / FLOW_PULSES_PER_LITER;
+  char payload[256];
+  char voltageText[24], currentText[24], powerText[24], energyText[24];
+
+  if (pzemReadingValid) {
+    snprintf(voltageText, sizeof(voltageText), "%.2f", pzemVoltage);
+    snprintf(currentText, sizeof(currentText), "%.3f", pzemCurrent);
+    snprintf(powerText, sizeof(powerText), "%.2f", pzemPower);
+    snprintf(energyText, sizeof(energyText), "%.3f", pzemEnergyKwh);
+  } else {
+    strcpy(voltageText, "null");
+    strcpy(currentText, "null");
+    strcpy(powerText, "null");
+    strcpy(energyText, "null");
+  }
+
+  int length = snprintf(payload, sizeof(payload),
+    "{\"voltage\":%s,\"current\":%s,\"power\":%s,\"energy_kwh\":%s,\"water_liters\":%.3f}",
+    voltageText, currentText, powerText, energyText, waterLiters);
+
+  if (length <= 0 || length >= (int)sizeof(payload)) {
+    Serial.println("[TELEMETRY] Payload too long");
+    return;
+  }
+
+  String topic = mqttTopic("telemetry");
+  if (client.publish(topic.c_str(), payload)) {
+    Serial.print("[TELEMETRY] Sent: ");
+    Serial.println(payload);
+  } else {
+    Serial.println("[TELEMETRY] Publish failed");
+  }
+}
+
 void loop() {
 
 
@@ -1269,8 +1200,11 @@ void loop() {
   // Door
   // ----------------------------------------------------
 
-  bool current =
-    digitalRead(DOOR_PIN);
+  processDoorLock();
+
+  readPzem();
+  readFlow();  // ISR keeps counting during touch delays and reconnection.
+  publishTelemetry();
 
 
   // ----------------------------------------------------
@@ -1281,9 +1215,7 @@ void loop() {
 
 
     String statusTopic =
-      String("laundry/") +
-      MACHINE_ID +
-      "/status";
+      mqttTopic("status");
 
 
     client.publish(
@@ -1293,9 +1225,7 @@ void loop() {
     );
 
     String stateTopic =
-      String("laundry/") +
-      MACHINE_ID +
-      "/state";
+      mqttTopic("state");
 
     client.publish(
       stateTopic.c_str(),
@@ -1315,35 +1245,6 @@ void loop() {
   // ----------------------------------------------------
 
   esp_task_wdt_reset();
-
-
-  // ----------------------------------------------------
-  // Finish Door Unlock
-  // ----------------------------------------------------
-
-  if (
-    lastState == HIGH &&
-    current == LOW
-  ) {
-
-
-    Serial.println("FINISH DOOR UNLOCK");
-
-
-    String finishTopic2 =
-      String("laundry/") +
-      MACHINE_ID +
-      "/finish";
-
-
-    client.publish(
-      finishTopic2.c_str(),
-      "1"
-    );
-  }
-
-
-  lastState = current;
 
 
   delayloop(50);

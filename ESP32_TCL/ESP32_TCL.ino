@@ -1,6 +1,8 @@
+#include <PZEM004Tv30.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 #include <esp_task_wdt.h>  // การทำ watchdog ทำต้อจากเพิ่ม Heartbeat เพื่อป้องกัน ESP ค้าง
 #include <Preferences.h>   // การทำ ESP จำโปรแกรมล่าสุด เวลาไฟดับ ESP รีบูต ต่อจากการทำ state โดยใช้หน่วยความจำในตัวของ ESP32 NVS
 
@@ -22,13 +24,17 @@ const char* password2 = "Suppakamlang";
 // MQTT
 // ======================================================
 
-const char* mqtt_server = "1f987687489a42f296be8b2579cd71f5.s1.eu.hivemq.cloud";
+const char* mqtt_server = "api.the-oasis-living.com";
 const int mqtt_port = 8883;
 
-const char* mqtt_user = "ESP32";
-const char* mqtt_pass = "Laundry123";
+const char* mqtt_user = "shop001-machine1";
+const char* mqtt_pass = "Pok14111411!";
 
-const char* MACHINE_ID = "machine2";
+// Change only these two IDs for another shop/machine.
+const char* SHOP_ID = "shop001";
+const char* MACHINE_ID = "machine1";
+String mqttBase() { return String("laundry/") + SHOP_ID + "/" + MACHINE_ID; }
+String mqttTopic(const char* suffix) { return mqttBase() + "/" + suffix; }
 
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
@@ -38,19 +44,72 @@ PubSubClient client(espClient);
 // PIN
 // ======================================================
 
-#define D0 15
-#define D1 2
-#define D2 4
-#define D5 16
-#define D6 17
-#define D7     // temp
-#define D8 18   // start
-#define D9 19   // arom
+#define D0 4
+#define D1 13
+#define D2 25
+#define D3 26
+#define D4 27
+#define D7 23       // TEMP
+#define D8 18       // START
+#define D9 19       // AROMA
 #define DOOR_PIN 32
 #define BUZZER_PIN 33
 
 
-bool lastState = HIGH;
+// PZEM-004T V3: ESP32 RX=16, TX=17 via 3.3V/5V level converter.
+PZEM004Tv30 pzem(Serial2, 16, 17);
+const unsigned long PZEM_INTERVAL_MS = 2000;
+unsigned long lastPzemRead = 0;
+void readPzem();
+
+// MQTT telemetry: send cached measurements every 10 seconds.
+const unsigned long TELEMETRY_INTERVAL_MS = 10000;
+unsigned long lastTelemetrySent = 0;
+bool pzemReadingValid = false;
+float pzemVoltage = 0;
+float pzemCurrent = 0;
+float pzemPower = 0;
+float pzemEnergyKwh = 0;
+void publishTelemetry();
+
+// Flow sensor: yellow -> spare HV channel, matching LV -> GPIO21.
+// Test total counts all water since ESP32 boot; no per-cycle reset or NVS yet.
+const uint8_t FLOW_PIN = 21;
+const double FLOW_PULSES_PER_LITER = 450.0;  // Calibrate with measured water.  FLOW_PULSES_PER_LITER = 450.0
+const unsigned long FLOW_INTERVAL_MS = 2000;
+portMUX_TYPE flowMux = portMUX_INITIALIZER_UNLOCKED;
+volatile uint32_t flowPulseCount = 0;
+// Reject falling edges closer than 2 ms (noise filter).
+volatile uint32_t lastFlowPulseUs = 0;
+const uint32_t FLOW_DEBOUNCE_US = 2000;
+uint32_t lastFlowPulseCount = 0;
+uint64_t flowTotalPulses = 0;
+unsigned long lastFlowRead = 0;
+void IRAM_ATTR onFlowPulse();
+void readFlow();
+
+// PC817: LOW = lock feedback present, HIGH = feedback absent.
+const unsigned long DOOR_LOCK_CONFIRM_MS = 500;
+const unsigned long DOOR_UNLOCK_CONFIRM_MS = 2000;
+const unsigned long DOOR_LOCK_TIMEOUT_MS = 30000;
+bool doorRawLocked = false;
+bool doorStableLocked = false;
+bool doorSampleReady = false;
+bool waitingForDoorLock = false;
+bool doorFinishSent = false;
+bool finishInProgress = false;  // Prevent repeated touch pulses during finish delays.
+unsigned long doorRawSince = 0;
+unsigned long doorWaitStarted = 0;
+
+// Explicit declarations also allow ordinary C++ syntax checks.
+void processBuzzer();
+void handleEvent(int count);
+void runProgram(int program);
+void startMachine();
+void finishMachine();
+void resetMachine();
+void processDoorLock();
+void setMachineState(const char* state);
 
 unsigned long lastStatus = 0; // 200469 เพิ่มอ่าน buuzer
 
@@ -76,10 +135,11 @@ int program = 0;
 // ======================================================
 
 byte pattern[16][5] = {
+
+  {0,0,1,0,0}, // 8 - 0
+  {0,0,1,0,1}, // 9 - 1
   {1,0,1,0,1}, // 10 - 2
   {1,0,1,0,0}, // 11 - 3
-  {0,0,1,0,0}, // 8 - 0
-  {0,0,1,0,1}, // 9 - 1  
   {1,0,1,1,0}, // 12 - 4
   {1,0,1,1,1}, // 13 - 5
   {0,0,1,1,1}, // 14 - 6
@@ -112,6 +172,7 @@ void delayloop(unsigned long waitTime) {
     client.loop();
 
     processBuzzer();   // 260569 ⭐ เพิ่มบรรทัดนี้
+    processDoorLock();
 
     esp_task_wdt_reset();
 
@@ -129,8 +190,8 @@ void sendPattern(int pos) {
   digitalWrite(D0, pattern[pos][0]);
   digitalWrite(D1, pattern[pos][1]);
   digitalWrite(D2, pattern[pos][2]);
-  digitalWrite(D5, pattern[pos][3]);
-  digitalWrite(D6, pattern[pos][4]);
+  digitalWrite(D3, pattern[pos][3]);
+  digitalWrite(D4, pattern[pos][4]);
 }
 
 
@@ -139,49 +200,55 @@ void sendPattern(int pos) {
 // ======================================================
 
 void callback(char* topic, byte* payload, unsigned int length) {
-
-  String msg;
-
-  for (int i = 0; i < length; i++) {
-    msg += (char)payload[i];
+  if (String(topic) != mqttTopic("cmd")) return;
+  if (length == 0 || length > 1024) {
+    Serial.println("[MQTT] Invalid command length");
+    return;
   }
 
-  String t = String(topic);
-
-
-  if (t == String("laundry/") + MACHINE_ID + "/tempPulse") {
-
-    tempPulse = msg.toInt();
+  StaticJsonDocument<1024> doc;
+  DeserializationError err = deserializeJson(doc, payload, length);
+  if (err || !doc.is<JsonObject>()) {
+    Serial.println("[MQTT] Invalid command JSON");
+    return;
   }
 
-
-  if (t == String("laundry/") + MACHINE_ID + "/aromaPulse") {
-
-    aromaPulse = msg.toInt();
-  }
-
-
-  if (t == String("laundry/") + MACHINE_ID + "/program") {
-
-    program = msg.toInt();
-
-    Serial.println("TEMP = " + String(tempPulse));
-    Serial.println("AROMA = " + String(aromaPulse));
-
-    runProgram(program);
-  }
-
-
-  if (t == String("laundry/") + MACHINE_ID + "/finish") {
-
+  const char* action = doc["action"] | "";
+  const char* type = doc["type"] | "";
+  if (strcmp(action, "finish") == 0 || strcmp(type, "finish") == 0) {
     finishMachine();
+    return;
   }
-
-
-  if (t == String("laundry/") + MACHINE_ID + "/reset") {
-
+  if (strcmp(action, "reset") == 0 || strcmp(type, "reset") == 0) {
     resetMachine();
+    return;
   }
+  if (strcmp(type, "wash") != 0) {
+    Serial.println("[MQTT] Unsupported command type");
+    return;
+  }
+  if (!doc["program"].is<int>() || !doc["tempPulse"].is<int>() ||
+      !doc["aromaPulse"].is<int>()) {
+    Serial.println("[MQTT] Missing wash parameters");
+    return;
+  }
+  int nextProgram = doc["program"].as<int>();
+  int nextTemp = doc["tempPulse"].as<int>();
+  int nextAroma = doc["aromaPulse"].as<int>();
+  if (nextProgram < 1 || nextProgram > 15 || nextTemp < 0 || nextTemp > 20 ||
+      nextAroma < 0 || nextAroma > 20) {
+    Serial.println("[MQTT] Invalid wash parameters");
+    return;
+  }
+  if (machineState != "IDLE") {
+    Serial.println("[MQTT] Ignored wash command: machine not IDLE");
+    return;
+  }
+  program = nextProgram;
+  tempPulse = nextTemp;
+  aromaPulse = nextAroma;
+  Serial.printf("[MQTT] Wash program=%d temp=%d aroma=%d\n", program, tempPulse, aromaPulse);
+  runProgram(program);
 }
 
 
@@ -206,6 +273,37 @@ void IRAM_ATTR onPulse() {
   buzzerActive = true;
 }
 
+
+// Count one falling edge per pulse. Keep this ISR independent of the buzzer.
+void IRAM_ATTR onFlowPulse() {
+  uint32_t nowUs = micros();
+  portENTER_CRITICAL_ISR(&flowMux);
+  if ((uint32_t)(nowUs - lastFlowPulseUs) >= FLOW_DEBOUNCE_US) {
+    flowPulseCount++;
+    lastFlowPulseUs = nowUs;
+  }
+  portEXIT_CRITICAL_ISR(&flowMux);
+}
+
+void readFlow() {
+  unsigned long now = millis();
+  unsigned long elapsed = now - lastFlowRead;
+  if (elapsed < FLOW_INTERVAL_MS) return;
+
+  portENTER_CRITICAL(&flowMux);
+  uint32_t pulses = flowPulseCount;
+  portEXIT_CRITICAL(&flowMux);
+
+  uint32_t delta = pulses - lastFlowPulseCount;
+  lastFlowPulseCount = pulses;
+  lastFlowRead = now;
+  flowTotalPulses += delta;
+
+  double liters = (double)flowTotalPulses / FLOW_PULSES_PER_LITER;
+  double rate = ((double)delta / FLOW_PULSES_PER_LITER) * 60000.0 / elapsed;
+  Serial.printf("[FLOW] Rate: %.2f L/min | Total: %.3f L | Pulses: %llu\n",
+                rate, liters, (unsigned long long)flowTotalPulses);
+}
 
 // ======================================================
 // PROCESS BUZZER
@@ -408,6 +506,9 @@ void setup() {
 
 
   String previousState = machineState;
+  if (previousState == "RUNNING" || previousState == "STARTING") {
+    machineState = "UNKNOWN";
+  }
 
 
   // ----------------------------------------------------
@@ -420,17 +521,26 @@ void setup() {
 
   pinMode(D2, OUTPUT);
 
-  pinMode(D5, OUTPUT);
+  pinMode(D3, OUTPUT);
 
-  pinMode(D6, OUTPUT);
+  pinMode(D4, OUTPUT);
 
-  pinMode(D7, OUTPUT);
+  pinMode(D7, OUTPUT);  // ปล่อย TEMP โดยไม่เปิด pull-up/down  pinMode(D7, OUTPUT);
+  digitalWrite(D7, LOW);
 
-  pinMode(D8, OUTPUT);
+  pinMode(D8, OUTPUT);  // ปล่อย TEMP โดยไม่เปิด pull-up/downpinMode(D8, OUTPUT);
+  digitalWrite(D8, LOW);
 
-  pinMode(D9, OUTPUT);
+  pinMode(D9, OUTPUT); // ปล่อย TEMP โดยไม่เปิด pull-up/down pinMode(D9, OUTPUT);
+  digitalWrite(D9, LOW);
 
   pinMode(DOOR_PIN, INPUT_PULLUP);
+
+  // The level converter supplies the pull-up on the 3.3 V side.
+  pinMode(FLOW_PIN, INPUT);
+  lastFlowRead = millis();
+  attachInterrupt(digitalPinToInterrupt(FLOW_PIN), onFlowPulse, FALLING);
+  Serial.println("[FLOW] GPIO21 ready; test total starts at boot (450 pulses/L)");
 
   pinMode(BUZZER_PIN, INPUT_PULLUP);
 
@@ -484,13 +594,11 @@ void setup() {
 
 
     String clientID =
-      String("Laundry") + MACHINE_ID;
+      String("Laundry_") + SHOP_ID + "_" + MACHINE_ID;
 
 
     String statusTopic =
-      String("laundry/") +
-      MACHINE_ID +
-      "/status";
+      mqttTopic("status");
 
 
     if (
@@ -508,11 +616,6 @@ void setup() {
 
       Serial.println("MQTT Connected");
 
-
-      client.publish(
-        "test/topic",
-        "ESP32 connected"
-      );
 
 
       client.publish(
@@ -533,7 +636,7 @@ void setup() {
         );
 
 
-      if (selectorMoving) {
+      if (selectorMoving && previousState != "RUNNING" && previousState != "STARTING") {
 
         Serial.println(
           "Recovery selector position"
@@ -551,121 +654,23 @@ void setup() {
       // State Recovery
       // -------------------------------------------------
 
-      if (previousState == "RUNNING") {
-
-
-        Serial.println(
-          "Was RUNNING before power loss"
-        );
-
-
-        String stateTopic =
-          String("laundry/") +
-          MACHINE_ID +
-          "/state";
-
-
-        client.publish(
-          stateTopic.c_str(),
-          "UNKNOWN"
-        );
-
-
+      if (previousState == "RUNNING" || previousState == "STARTING") {
+        Serial.println("[RECOVERY] Waiting for actual door lock feedback");
+        waitingForDoorLock = true;
+        doorFinishSent = false;
+        doorSampleReady = false;
+        doorStableLocked = false;
+        doorWaitStarted = millis();
+        setMachineState("UNKNOWN");
       } else {
-
-
-        String stateTopic2 =
-          String("laundry/") +
-          MACHINE_ID +
-          "/state";
-
-
-        client.publish(
-          stateTopic2.c_str(),
-          machineState.c_str()
-        );
+        String stateTopic = mqttTopic("state");
+        client.publish(stateTopic.c_str(), machineState.c_str(), true);
       }
 
 
-      if (state == "RUNNING") {
-
-
-        Serial.println(
-          "Recovering program..."
-        );
-
-
-        String stateTopic3 =
-          String("laundry/") +
-          MACHINE_ID +
-          "/state";
-
-
-        client.publish(
-          stateTopic3.c_str(),
-          "RUNNING"
-        );
-      }
-
-
-      // -------------------------------------------------
-      // MQTT Subscribe
-      // -------------------------------------------------
-
-      String programTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/program";
-
-
-      String finishTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/finish";
-
-
-      String resetTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/reset";
-
-
-      String aromaTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/aromaPulse";
-
-
-      String tempTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/tempPulse";
-
-
-      client.subscribe(
-        programTopic.c_str()
-      );
-
-
-      client.subscribe(
-        finishTopic.c_str()
-      );
-
-
-      client.subscribe(
-        resetTopic.c_str()
-      );
-
-
-      client.subscribe(
-        aromaTopic.c_str()
-      );
-
-
-      client.subscribe(
-        tempTopic.c_str()
-      );
-
+      // Subscribe to the single JSON command topic.
+      String commandTopic = mqttTopic("cmd");
+      client.subscribe(commandTopic.c_str());
 
     } else {
 
@@ -686,63 +691,77 @@ void setup() {
 // ======================================================
 
 void startMachine() {
-
+  // Save STARTING before issuing the touch pulse; RUNNING needs lock feedback.
+  waitingForDoorLock = false;
+  doorFinishSent = false;
+  doorSampleReady = false;
+  doorStableLocked = false;
+  setMachineState("STARTING");
+  prefs.putInt("program", program);
+  prefs.putBool("selectorMoving", false);
 
   digitalWrite(D8, HIGH);
-
-
   Serial.println("TOUCH BTN POWER");
-
-
-  delayloop(1000);
-
-
+  delayloop(600);
   digitalWrite(D8, LOW);
-
-
   Serial.println("POWER ON");
+  delayloop(800);
 
+  // Start the timeout only after the original touch sequence is complete.
+  doorSampleReady = false;
+  doorWaitStarted = millis();
+  waitingForDoorLock = (machineState == "STARTING");
+  Serial.println("[DOOR] Waiting for lock (GPIO32 LOW)");
+}
 
-  delayloop(1000);
+// ======================================================
+// DOOR LOCK FEEDBACK
+// ======================================================
 
+void setMachineState(const char* state) {
+  machineState = state;
+  prefs.putString("state", state);
+  String topic = mqttTopic("state");
+  client.publish(topic.c_str(), state, true);
+  Serial.print("[STATE] ");
+  Serial.println(state);
+}
 
-  machineState = "RUNNING";
+void processDoorLock() {
+  unsigned long now = millis();
+  bool locked = (digitalRead(DOOR_PIN) == LOW);
+  if (!doorSampleReady || locked != doorRawLocked) {
+    doorSampleReady = true;
+    doorRawLocked = locked;
+    doorRawSince = now;
+  }
 
+  unsigned long confirmTime = locked ? DOOR_LOCK_CONFIRM_MS : DOOR_UNLOCK_CONFIRM_MS;
+  if (now - doorRawSince >= confirmTime && doorStableLocked != locked) {
+    doorStableLocked = locked;
+    Serial.println(locked ? "[DOOR] LOCKED" : "[DOOR] UNLOCKED");
 
-  String stateTopic4 =
-    String("laundry/") +
-    MACHINE_ID +
-    "/state";
+  }
 
+  // Finish locally after a confirmed unlock; no MQTT command round trip.
+  // Only RUNNING can auto-finish, so an unlocked door at idle/start is ignored.
+  if (!locked && !doorStableLocked && now - doorRawSince >= DOOR_UNLOCK_CONFIRM_MS &&
+      machineState == "RUNNING" && !doorFinishSent && !finishInProgress) {
+    doorFinishSent = true;
+    Serial.println("FINISH DOOR UNLOCK (stable 2 seconds)");
+    finishMachine();
+    return;
+  }
 
-  client.publish(
-    stateTopic4.c_str(),
-    "RUNNING"
-  );
-
-
-  Serial.println("[STATE] RUNNING");
-
-
-  prefs.putString(
-    "state",
-    "RUNNING"
-  );
-
-
-  prefs.putInt(
-    "program",
-    program
-  );
-
-
-  Serial.println("Machine Start");
-
-
-  prefs.putBool(
-    "selectorMoving",
-    false
-  );
+  if (waitingForDoorLock && locked && doorStableLocked) {
+    waitingForDoorLock = false;
+    setMachineState("RUNNING");
+    Serial.println("Machine Start confirmed by Door Lock");
+  } else if (waitingForDoorLock && now - doorWaitStarted >= DOOR_LOCK_TIMEOUT_MS) {
+    waitingForDoorLock = false;
+    setMachineState("ERROR");
+    Serial.println("[DOOR] Lock not confirmed within 30 seconds; inspect door and retry after reset");
+  }
 }
 
 
@@ -767,70 +786,38 @@ void runProgram(int program) {
 
   Serial.println("Goto Cal");
 
-
   sendPattern(0);
-
-
-  delayloop(3000);
-
-
+  delayloop(2000);
   Serial.println("Goto Cal+1");
 
-
   sendPattern(1);
-
-
-  delayloop(3000);
-
+  delayloop(2000);
 
   // i = 2 เพราะ Goto Calibate+1 ไปแล้ว
 
   for (int i = 2; i <= program; i++) {
 
-
     Serial.print("Position ");
-
     Serial.println(i);
-
-
     sendPattern(i);
-
-
-    delayloop(800);
-
-
+    delayloop(400);
     client.loop();
   }
 
-
-  delayloop(2000);
-
+  delayloop(1000);
 
   // ----------------------------------------------------
   // Temperature Pulse
   // ----------------------------------------------------
 
   for (int i = 0; i < tempPulse; i++) {
-
-
     digitalWrite(D7, HIGH);
-
-
     Serial.println("TEMP Pulse ON");
-
-
-    delayloop(800);
-
-
+    delayloop(600);
     digitalWrite(D7, LOW);
-
-
     Serial.println("TEMP Pulse OFF");
-
-
-    delayloop(1000);
+    delayloop(800);
   }
-
 
   delayloop(2000);
 
@@ -841,25 +828,13 @@ void runProgram(int program) {
 
   for (int i = 0; i < aromaPulse; i++) {
 
-
     digitalWrite(D9, HIGH);
-
-
     Serial.println("AROMA Pulse ON");
-
-
-    delayloop(800);
-
-
+    delayloop(600);
     digitalWrite(D9, LOW);
-
-
     Serial.println("AROMA Pulse OFF");
-
-
-    delayloop(1000);
+    delayloop(800);
   }
-
 
   delayloop(2000);
 
@@ -873,42 +848,33 @@ void runProgram(int program) {
 // ======================================================
 
 void finishMachine() {
-
+  // delayloop() also services MQTT and the door input. Ignore duplicate finish
+  // commands while finishing, and delayed commands after returning to IDLE.
+  if (finishInProgress || machineState == "IDLE" || machineState == "FINISH") {
+    return;
+  }
+  finishInProgress = true;
+  waitingForDoorLock = false;
+  doorFinishSent = true;
 
   Serial.println("Finish → OFF");
-
-
   digitalWrite(D8, HIGH);
-
-
   Serial.println("TOUCH BTN POWER");
-
+  delayloop(800);
+  digitalWrite(D8, LOW);
+  Serial.println("POWER OFF");
 
   delayloop(800);
 
-
-  digitalWrite(D8, LOW);
-
-
-  Serial.println("POWER OFF");
-
-
-  delayloop(1000);
-
-
   sendPattern(15);
 
-
   delayloop(2000);
-
 
   machineState = "FINISH";
 
 
   String stateTopic5 =
-    String("laundry/") +
-    MACHINE_ID +
-    "/state";
+    mqttTopic("state");
 
 
   client.publish(
@@ -930,6 +896,7 @@ void finishMachine() {
 
 
   resetMachine();
+  finishInProgress = false;
 }
 
 
@@ -947,13 +914,10 @@ void reconnect() {
 
 
       String clientID =
-        String("Laundry") +
-        MACHINE_ID;
+        String("Laundry_") + SHOP_ID + "_" + MACHINE_ID;
 
       String statusTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/status";
+        mqttTopic("status");
 
       if (
         client.connect(
@@ -967,50 +931,24 @@ void reconnect() {
         )
       ) {
 
+      Serial.println("[MQTT] Reconnected OK");
 
-      String programTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/program";
+      String commandTopic = mqttTopic("cmd");
+      client.subscribe(commandTopic.c_str());
+      client.publish(statusTopic.c_str(), "ONLINE", true);
+      String stateTopic = mqttTopic("state");
+      client.publish(stateTopic.c_str(), machineState.c_str(), true);
 
-
-      String finishTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/finish";
-
-
-      String resetTopic =
-        String("laundry/") +
-        MACHINE_ID +
-        "/reset";
-
-      String aromaTopic = String("laundry/") + MACHINE_ID + "/aromaPulse";
-
-      String tempTopic = String("laundry/") + MACHINE_ID + "/tempPulse";
-
-
-
-      client.subscribe(
-        programTopic.c_str()
-      );
-
-
-      client.subscribe(
-        finishTopic.c_str()
-      );
-
-
-      client.subscribe(
-        resetTopic.c_str()
-      );
-
-      client.subscribe(aromaTopic.c_str());
-
-      client.subscribe(tempTopic.c_str());
-      
     } else {
 
+  Serial.print("[MQTT] Failed, state = ");
+  Serial.println(client.state());
+
+  Serial.print("[WiFi] status = ");
+  Serial.println(WiFi.status());
+
+  Serial.print("[WiFi] RSSI = ");
+  Serial.println(WiFi.RSSI());
 
       delayloop(2000);
     }
@@ -1051,6 +989,9 @@ void checkWiFi() {
 // ======================================================
 
 void resetMachine() {
+  waitingForDoorLock = false;
+  doorFinishSent = false;
+
 
 
   Serial.println("Reset Machine -> IDLE");
@@ -1063,9 +1004,7 @@ void resetMachine() {
 
 
   String stateTopic6 =
-    String("laundry/") +
-    MACHINE_ID +
-    "/state";
+    mqttTopic("state");
 
 
   client.publish(
@@ -1155,6 +1094,80 @@ void handleEvent(int count) {
 // LOOP
 // ======================================================
 
+// Read outside delayloop() to preserve touch pulse timing.
+// Energy total belongs to the PZEM; this does not reset or store it.
+void readPzem() {
+  if (millis() - lastPzemRead < PZEM_INTERVAL_MS) return;
+  lastPzemRead = millis();
+
+  esp_task_wdt_reset();
+  float voltage = pzem.voltage();
+  float current = pzem.current();
+  float power = pzem.power();
+  float energy = pzem.energy();
+  esp_task_wdt_reset();
+
+  if (isnan(voltage) || isnan(current) ||
+      isnan(power) || isnan(energy)) {
+    pzemReadingValid = false;
+    Serial.println("[PZEM] Cannot read PZEM");
+    return;
+  }
+
+  pzemVoltage = voltage;
+  pzemCurrent = current;
+  pzemPower = power;
+  pzemEnergyKwh = energy;
+  pzemReadingValid = true;
+
+  Serial.printf("[PZEM] Voltage : %.1f V\n", voltage);
+  Serial.printf("[PZEM] Current : %.3f A\n", current);
+  Serial.printf("[PZEM] Power   : %.1f W\n", power);
+  Serial.printf("[PZEM] Energy total : %.3f kWh\n", energy);
+}
+
+// Publish only when connected. Missing PZEM readings are sent as JSON null,
+// never as an invented zero. Water is cumulative since ESP32 boot.
+void publishTelemetry() {
+  unsigned long now = millis();
+  if (now - lastTelemetrySent < TELEMETRY_INTERVAL_MS) return;
+  if (!client.connected()) return;
+
+  lastTelemetrySent = now;
+  double waterLiters = (double)flowTotalPulses / FLOW_PULSES_PER_LITER;
+  char payload[256];
+  char voltageText[24], currentText[24], powerText[24], energyText[24];
+
+  if (pzemReadingValid) {
+    snprintf(voltageText, sizeof(voltageText), "%.2f", pzemVoltage);
+    snprintf(currentText, sizeof(currentText), "%.3f", pzemCurrent);
+    snprintf(powerText, sizeof(powerText), "%.2f", pzemPower);
+    snprintf(energyText, sizeof(energyText), "%.3f", pzemEnergyKwh);
+  } else {
+    strcpy(voltageText, "null");
+    strcpy(currentText, "null");
+    strcpy(powerText, "null");
+    strcpy(energyText, "null");
+  }
+
+  int length = snprintf(payload, sizeof(payload),
+    "{\"voltage\":%s,\"current\":%s,\"power\":%s,\"energy_kwh\":%s,\"water_liters\":%.3f}",
+    voltageText, currentText, powerText, energyText, waterLiters);
+
+  if (length <= 0 || length >= (int)sizeof(payload)) {
+    Serial.println("[TELEMETRY] Payload too long");
+    return;
+  }
+
+  String topic = mqttTopic("telemetry");
+  if (client.publish(topic.c_str(), payload)) {
+    Serial.print("[TELEMETRY] Sent: ");
+    Serial.println(payload);
+  } else {
+    Serial.println("[TELEMETRY] Publish failed");
+  }
+}
+
 void loop() {
 
 
@@ -1182,8 +1195,11 @@ void loop() {
   // Door
   // ----------------------------------------------------
 
-  bool current =
-    digitalRead(DOOR_PIN);
+  processDoorLock();
+
+  readPzem();
+  readFlow();  // ISR keeps counting during touch delays and reconnection.
+  publishTelemetry();
 
 
   // ----------------------------------------------------
@@ -1194,9 +1210,7 @@ void loop() {
 
 
     String statusTopic =
-      String("laundry/") +
-      MACHINE_ID +
-      "/status";
+      mqttTopic("status");
 
 
     client.publish(
@@ -1206,9 +1220,7 @@ void loop() {
     );
 
     String stateTopic =
-      String("laundry/") +
-      MACHINE_ID +
-      "/state";
+      mqttTopic("state");
 
     client.publish(
       stateTopic.c_str(),
@@ -1228,35 +1240,6 @@ void loop() {
   // ----------------------------------------------------
 
   esp_task_wdt_reset();
-
-
-  // ----------------------------------------------------
-  // Finish Door Unlock
-  // ----------------------------------------------------
-
-  if (
-    lastState == HIGH &&
-    current == LOW
-  ) {
-
-
-    Serial.println("FINISH DOOR UNLOCK");
-
-
-    String finishTopic2 =
-      String("laundry/") +
-      MACHINE_ID +
-      "/finish";
-
-
-    client.publish(
-      finishTopic2.c_str(),
-      "1"
-    );
-  }
-
-
-  lastState = current;
 
 
   delayloop(50);

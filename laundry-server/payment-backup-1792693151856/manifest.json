@@ -1,0 +1,37 @@
+[
+  {
+    "name": "src/App.jsx",
+    "existed": true,
+    "after": "e02df8e5472cbc135a85aa033969f0e710f83172c48a0767835ae6829cffbe36"
+  },
+  {
+    "name": "src/components/QRPayment.jsx",
+    "existed": true,
+    "after": "bd79dc8d98dd76958fe2f4bf852564961635734b34402843176155b8def3c5b1"
+  },
+  {
+    "name": "laundry-server/payment-bridge.cjs",
+    "existed": false,
+    "after": "3c9cf76aee69b999427335db381ecfb972bef99cf24415b919d30dfeeb038211"
+  },
+  {
+    "name": "laundry-server/payment-bridge.test.cjs",
+    "existed": false,
+    "after": "cd35cc41694f27f6939c29f7246a2e7ab3821971ae29416a1adee00c2932357b"
+  },
+  {
+    "name": "laundry-server/payment-checkout.cjs",
+    "existed": true,
+    "after": "48bf2230f3243d2253f949e1fa25981f72b38d1082363a5b700e4575c145ceeb"
+  },
+  {
+    "name": "laundry-server/server.cjs",
+    "existed": true,
+    "after": "c860510011e9abc12c5436af31306ec9c97846f34e472143bb6ac334fa626402"
+  },
+  {
+    "name": "src/components/MachineSelectionGrid.jsx",
+    "existed": true,
+    "after": "92d32e8581ca3e4e7ec37f2ef720c1a022930d8e44db09843e2c6e90265a2825"
+  }
+]

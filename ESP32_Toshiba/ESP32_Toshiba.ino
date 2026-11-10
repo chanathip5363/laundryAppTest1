@@ -50,27 +50,7 @@ PubSubClient client(espClient);
 #define BUZZER_PIN 33
 
 
-// PC817: LOW = lock feedback present, HIGH = feedback absent.
-const unsigned long DOOR_LOCK_CONFIRM_MS = 500;
-const unsigned long DOOR_UNLOCK_CONFIRM_MS = 2000;
-const unsigned long DOOR_LOCK_TIMEOUT_MS = 30000;
-bool doorRawLocked = false;
-bool doorStableLocked = false;
-bool doorSampleReady = false;
-bool waitingForDoorLock = false;
-bool doorFinishSent = false;
-unsigned long doorRawSince = 0;
-unsigned long doorWaitStarted = 0;
-
-// Explicit declarations also allow ordinary C++ syntax checks.
-void processBuzzer();
-void handleEvent(int count);
-void runProgram(int program);
-void startMachine();
-void finishMachine();
-void resetMachine();
-void processDoorLock();
-void setMachineState(const char* state);
+bool lastState = HIGH;
 
 unsigned long lastStatus = 0; // 200469 เพิ่มอ่าน buuzer
 
@@ -133,7 +113,6 @@ void delayloop(unsigned long waitTime) {
     client.loop();
 
     processBuzzer();   // 260569 ⭐ เพิ่มบรรทัดนี้
-    processDoorLock();
 
     esp_task_wdt_reset();
 
@@ -430,9 +409,6 @@ void setup() {
 
 
   String previousState = machineState;
-  if (previousState == "RUNNING" || previousState == "STARTING") {
-    machineState = "UNKNOWN";
-  }
 
 
   // ----------------------------------------------------
@@ -561,7 +537,7 @@ void setup() {
         );
 
 
-      if (selectorMoving && previousState != "RUNNING" && previousState != "STARTING") {
+      if (selectorMoving) {
 
         Serial.println(
           "Recovery selector position"
@@ -579,17 +555,60 @@ void setup() {
       // State Recovery
       // -------------------------------------------------
 
-      if (previousState == "RUNNING" || previousState == "STARTING") {
-        Serial.println("[RECOVERY] Waiting for actual door lock feedback");
-        waitingForDoorLock = true;
-        doorFinishSent = false;
-        doorSampleReady = false;
-        doorStableLocked = false;
-        doorWaitStarted = millis();
-        setMachineState("UNKNOWN");
+      if (previousState == "RUNNING") {
+
+
+        Serial.println(
+          "Was RUNNING before power loss"
+        );
+
+
+        String stateTopic =
+          String("laundry/") +
+          MACHINE_ID +
+          "/state";
+
+
+        client.publish(
+          stateTopic.c_str(),
+          "UNKNOWN"
+        );
+
+
       } else {
-        String stateTopic = String("laundry/") + MACHINE_ID + "/state";
-        client.publish(stateTopic.c_str(), machineState.c_str(), true);
+
+
+        String stateTopic2 =
+          String("laundry/") +
+          MACHINE_ID +
+          "/state";
+
+
+        client.publish(
+          stateTopic2.c_str(),
+          machineState.c_str()
+        );
+      }
+
+
+      if (state == "RUNNING") {
+
+
+        Serial.println(
+          "Recovering program..."
+        );
+
+
+        String stateTopic3 =
+          String("laundry/") +
+          MACHINE_ID +
+          "/state";
+
+
+        client.publish(
+          stateTopic3.c_str(),
+          "RUNNING"
+        );
       }
 
 
@@ -671,14 +690,6 @@ void setup() {
 // ======================================================
 
 void startMachine() {
-  // Save STARTING before issuing the touch pulse; RUNNING needs lock feedback.
-  waitingForDoorLock = false;
-  doorFinishSent = false;
-  doorSampleReady = false;
-  doorStableLocked = false;
-  setMachineState("STARTING");
-  prefs.putInt("program", program);
-  prefs.putBool("selectorMoving", false);
 
   digitalWrite(D8, HIGH);
   Serial.println("TOUCH BTN POWER");
@@ -687,66 +698,43 @@ void startMachine() {
   Serial.println("POWER ON");
   delayloop(1000);
 
-  // Start the timeout only after the original touch sequence is complete.
-  doorSampleReady = false;
-  doorWaitStarted = millis();
-  waitingForDoorLock = (machineState == "STARTING");
-  Serial.println("[DOOR] Waiting for lock (GPIO32 LOW)");
-}
+  machineState = "RUNNING";
 
-// ======================================================
-// DOOR LOCK FEEDBACK
-// ======================================================
 
-void setMachineState(const char* state) {
-  machineState = state;
-  prefs.putString("state", state);
-  String topic = String("laundry/") + MACHINE_ID + "/state";
-  client.publish(topic.c_str(), state, true);
-  Serial.print("[STATE] ");
-  Serial.println(state);
-}
+  String stateTopic4 =
+    String("laundry/") +
+    MACHINE_ID +
+    "/state";
 
-void processDoorLock() {
-  unsigned long now = millis();
-  bool locked = (digitalRead(DOOR_PIN) == LOW);
-  if (!doorSampleReady || locked != doorRawLocked) {
-    doorSampleReady = true;
-    doorRawLocked = locked;
-    doorRawSince = now;
-  }
 
-  unsigned long confirmTime = locked ? DOOR_LOCK_CONFIRM_MS : DOOR_UNLOCK_CONFIRM_MS;
-  if (now - doorRawSince >= confirmTime && doorStableLocked != locked) {
-    doorStableLocked = locked;
-    Serial.println(locked ? "[DOOR] LOCKED" : "[DOOR] UNLOCKED");
+  client.publish(
+    stateTopic4.c_str(),
+    "RUNNING"
+  );
 
-    if (!locked && machineState == "RUNNING" && !doorFinishSent) {
-      doorFinishSent = true;
-      Serial.println("FINISH DOOR UNLOCK");
-      String topic = String("laundry/") + MACHINE_ID + "/finish";
-      // The existing /finish callback performs finishMachine().
-      // Mark sent only on success so the main loop can retry if disconnected.
-      doorFinishSent = client.publish(topic.c_str(), "1");
-    }
-  }
 
-  // Retry a failed finish publication without repeating hardware actions here.
-  if (!locked && !doorStableLocked && now - doorRawSince >= DOOR_UNLOCK_CONFIRM_MS &&
-      machineState == "RUNNING" && !doorFinishSent) {
-    String topic = String("laundry/") + MACHINE_ID + "/finish";
-    doorFinishSent = client.publish(topic.c_str(), "1");
-  }
+  Serial.println("[STATE] RUNNING");
 
-  if (waitingForDoorLock && locked && doorStableLocked) {
-    waitingForDoorLock = false;
-    setMachineState("RUNNING");
-    Serial.println("Machine Start confirmed by Door Lock");
-  } else if (waitingForDoorLock && now - doorWaitStarted >= DOOR_LOCK_TIMEOUT_MS) {
-    waitingForDoorLock = false;
-    setMachineState("ERROR");
-    Serial.println("[DOOR] Lock not confirmed within 30 seconds; inspect door and retry after reset");
-  }
+
+  prefs.putString(
+    "state",
+    "RUNNING"
+  );
+
+
+  prefs.putInt(
+    "program",
+    program
+  );
+
+
+  Serial.println("Machine Start");
+
+
+  prefs.putBool(
+    "selectorMoving",
+    false
+  );
 }
 
 
@@ -852,9 +840,6 @@ void runProgram(int program) {
 // ======================================================
 
 void finishMachine() {
-  waitingForDoorLock = false;
-  doorFinishSent = true;
-
 
 
   Serial.println("Finish → OFF");
@@ -1041,9 +1026,6 @@ void checkWiFi() {
 // ======================================================
 
 void resetMachine() {
-  waitingForDoorLock = false;
-  doorFinishSent = false;
-
 
 
   Serial.println("Reset Machine -> IDLE");
@@ -1175,7 +1157,8 @@ void loop() {
   // Door
   // ----------------------------------------------------
 
-  processDoorLock();
+  bool current =
+    digitalRead(DOOR_PIN);
 
 
   // ----------------------------------------------------
@@ -1220,6 +1203,35 @@ void loop() {
   // ----------------------------------------------------
 
   esp_task_wdt_reset();
+
+
+  // ----------------------------------------------------
+  // Finish Door Unlock
+  // ----------------------------------------------------
+
+  if (
+    lastState == HIGH &&
+    current == LOW
+  ) {
+
+
+    Serial.println("FINISH DOOR UNLOCK");
+
+
+    String finishTopic2 =
+      String("laundry/") +
+      MACHINE_ID +
+      "/finish";
+
+
+    client.publish(
+      finishTopic2.c_str(),
+      "1"
+    );
+  }
+
+
+  lastState = current;
 
 
   delayloop(50);

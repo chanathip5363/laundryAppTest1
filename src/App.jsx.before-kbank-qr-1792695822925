@@ -1,0 +1,849 @@
+import { useEffect, useState } from "react";
+import mqttClient from "./mqtt/mqttClient";
+import { getTempPulse } from "./utils/getTempPulse";
+import { getAromaPulse } from "./utils/getAromaPulse";
+import { MQTT_TOPICS } from "./constants/mqttTopics";
+import { setupMqttHandlers } from "./mqtt/mqttHandlers";
+import { calculateTotalPrice } from "./price/priceLogic";
+import { calculateDryTotalPrice } from "./price/dryPriceLogic";
+import ServiceSelection from "./components/ServiceSelection";
+import WashPriceSelection from "./components/WashPriceSelection";
+import Wash20Selection from "./components/Wash20Selection";
+import Wash30ProgramSelection from "./components/Wash30ProgramSelection";
+import Wash30Options from "./components/Wash30Options";
+import Wash50Selection from "./components/Wash50Selection";
+import Dry1Selection from "./components/Dry1Selection";
+import Dry1ProgramSelection from "./components/Dry1ProgramSelection";
+import Dry1Options from "./components/Dry1Options";
+import Dry2Selection from "./components/Dry2Selection";
+import Dry2ProgramSelection from "./components/Dry2ProgramSelection";
+import Dry2Options from "./components/Dry2Options";
+import Dry3Selection from "./components/Dry3Selection";
+import Dry3ProgramSelection from "./components/Dry3ProgramSelection";
+import Dry3Options from "./components/Dry3Options";
+import Dry4Selection from "./components/Dry4Selection";
+import Dry4ProgramSelection from "./components/Dry4ProgramSelection";
+import Dry4Options from "./components/Dry4Options";
+import WashMachineSelection from "./components/WashMachineSelection";
+import DryMachineSelection from "./components/DryMachineSelection";
+import QRPayment from "./components/QRPayment";
+import DrySelection from "./components/DrySelection";
+import getMachineConfig from "./config/getMachineConfig";
+import {
+  tempOptionsMap,
+  tempShowOptionsMap,
+  aromaOptionsMap,
+  programNameMap,
+  tempPriceMap,
+} from "./constants/laundryConfig";
+
+
+const PAYMENT_API = "https://api.the-oasis-living.com";
+
+function App() {
+  const [client, setClient] = useState(null);
+  const [status, setStatus] = useState("Disconnected");
+  const [program, setProgram] = useState(0);
+  const [prices, setPrices] = useState({}); // 200369-02 เพิ่ม state เก็บราคา
+
+
+const [step, setStep] = useState(1);
+const SHOW_TEST_BUTTONS = true;
+const [mode, setMode] = useState(null);
+const [selectedMachine, setSelectedMachine] = useState(null);
+const [reservedUntil, setReservedUntil] = useState(null);
+
+useEffect(() => {
+  if (selectedMachine) {
+    console.log("✅ SELECTED MACHINE:", selectedMachine);
+  }
+}, [selectedMachine]);
+
+const selectedMachineConfig = getMachineConfig(selectedMachine);
+
+const configProgramNameMap =
+  selectedMachineConfig?.config?.programs
+    ? Object.fromEntries(
+        Object.entries(selectedMachineConfig.config.programs).map(
+          ([id, programData]) => [id, programData.name]
+        )
+      )
+    : programNameMap;
+
+const configTempPriceMap =
+  selectedMachineConfig?.config?.temperaturePrice
+    ?? tempPriceMap;
+const configTempOptionsMap =
+  selectedMachineConfig?.config?.programs
+    ? Object.fromEntries(
+        Object.entries(selectedMachineConfig.config.programs).map(
+          ([id, programData]) => [id, programData.temperature]
+        )
+      )
+    : tempOptionsMap;    
+const configAromaPrice =
+  selectedMachineConfig?.config?.aromaPrice ?? 5;
+
+const configAromaOptionsMap =
+  selectedMachineConfig?.config?.programs
+    ? Object.fromEntries(
+        Object.entries(selectedMachineConfig.config.programs)
+          .filter(([, programData]) => programData.aroma)
+          .map(([id]) => [
+            id,
+            [`เพิ่ม Aroma (+${configAromaPrice} บาท)`]
+          ])
+      )
+    : aromaOptionsMap;
+
+const [basePrice, setBasePrice] = useState(0);
+
+const [modeTemp, setModeTemp] = useState(null);
+
+// กำหนดขึ้นมาเพื่อกำหนดค่าอ้างอิงว่ามีทั้งหมด กี่องศา บ้าง
+const [tempOption, setTempOption] = useState(null);
+// "20" | "30" | "40" | "60" | "90" | null
+
+const [tempShowOption, setTempShowOption] = useState(null);
+const [tempShow, setTempShow] = useState(null);
+
+const [aromaOption, setAromaOption] = useState(null);
+
+const [temp, setTemp] = useState(null);
+const [spin, setSpin] = useState(null);
+const [aroma, setAroma] = useState(null);
+
+const [dry1price, setDry1Prices] = useState(0);
+const [dry1program, setDry1Program] = useState(0);
+const [dry2price, setDry2Prices] = useState({});
+const [dry2program, setDry2Program] = useState({});
+const [dry3price, setDry3Prices] = useState({});
+const [dry3program, setDry3Program] = useState({});
+const [dry4price, setDry4Prices] = useState({});
+const [dry4program, setDry4Program] = useState({});
+
+const [dry1TemperatureOption, setDry1TemperatureOption] = useState(null);
+const [dry1WrinkleOption, setDry1WrinkleOption] = useState(false);
+
+const [dry2TemperatureOption, setDry2TemperatureOption] = useState(null);
+const [dry2WrinkleOption, setDry2WrinkleOption] = useState(false);
+
+const [dry3TemperatureOption, setDry3TemperatureOption] = useState(null);
+const [dry3WrinkleOption, setDry3WrinkleOption] = useState(false);
+
+const [dry4TemperatureOption, setDry4TemperatureOption] = useState(null);
+const [dry4WrinkleOption, setDry4WrinkleOption] = useState(false);
+
+const getDry1TotalPrice = () => {
+  return calculateDryTotalPrice({
+    basePrice: dry1price,
+    program: dry1program,
+    temperatureOption: dry1TemperatureOption,
+    wrinkleOption: dry1WrinkleOption,
+    dryerType: "dry1",
+  });
+};
+
+const getDry2TotalPrice = () => {
+  return calculateDryTotalPrice({
+    basePrice: dry2price,
+    program: dry2program,
+    temperatureOption: dry2TemperatureOption,
+    wrinkleOption: dry2WrinkleOption,
+    dryerType: "dry2",
+  });
+};
+
+const getDry3TotalPrice = () => {
+  return calculateDryTotalPrice({
+    basePrice: dry3price,
+    program: dry3program,
+    temperatureOption: dry3TemperatureOption,
+    wrinkleOption: dry3WrinkleOption,
+    dryerType: "dry3",
+  });
+};
+
+const getDry4TotalPrice = () => {
+  return calculateDryTotalPrice({
+    basePrice: dry4price,
+    program: dry4program,
+    temperatureOption: dry4TemperatureOption,
+    wrinkleOption: dry4WrinkleOption,
+    dryerType: "dry4",
+  });
+};
+
+// 220369 15:00 เป็นค่าที่นำมาจากเครื่อง Toshiba 1:ชุดกีฬา 20/30/40 องศา 2:ผ้าขนสัตว์ 20/30/40 องศา 3:ผ้าบอบบาง 20/30/40 องศา 5:ผ้าผสม 20/30/40 องศา
+// 7:ผ้าฝ้าย 20/30/40 องศา 8:ผ้าขาว 20/30/40 องศา 9:ซักถนอนสีผ้า 20/30/40 องศา
+
+
+
+
+
+
+
+
+
+// 220369 15:00 เป็นการ map ค่าราคาที่เพิ่ม เพื่อให้แสดงในหน้าอุณหภูมิ เพราะเดิมมีแต่ องศา แสดงตาม tempOptionMap
+// ซึ่งถ้าเพิ่ม (+ 5 บาท) มันจะเพิ่มทุก องศา จึงใช้วิธีนี้และใช้โค้ด °C (+ {tempPriceMap[temp]} บาท)
+
+
+const [programPrice, setProgramPrice] = useState(0);
+
+const STEP_QR = 99;
+
+const pageTitle =
+  step === 1
+    ? "ยินดีต้อนรับ"
+    : step === 1_1
+    ? "เลือกเครื่องซักผ้า"
+    : step === 1_2
+    ? "เลือกเครื่องอบผ้า"
+    : step === STEP_QR
+    ? "ชำระค่าบริการ"
+    : mode === "wash"
+    ? "เลือกโปรแกรมซักผ้า"
+    : "เลือกโปรแกรมอบผ้า";
+
+const pageDescription =
+  step === 1
+    ? "กรุณาเลือกบริการที่ต้องการ"
+    : step === 1_1 || step === 1_2
+    ? "กรุณาเลือกเครื่องที่ต้องการใช้บริการ"
+    : step === STEP_QR
+    ? "ตรวจสอบรายละเอียดและชำระค่าบริการ"
+    : "เลือกโปรแกรมและตัวเลือกที่ต้องการ";
+
+
+const getTotalPrice = () => {
+
+return calculateTotalPrice({
+  programPrice,
+  tempOption,
+  aromaOption,
+  tempPriceMap: configTempPriceMap,
+  aromaPrice: configAromaPrice
+});
+};
+
+const getPaymentTotal = () => {
+  if (mode === "dry" && selectedMachine === "machine5") {
+    return getDry1TotalPrice();
+  }
+
+  if (mode === "dry" && selectedMachine === "machine6") {
+    return getDry2TotalPrice();
+  }
+
+  if (mode === "dry" && selectedMachine === "machine7") {
+    return getDry3TotalPrice();
+  }  
+
+    if (mode === "dry" && selectedMachine === "machine8") {
+    return getDry4TotalPrice();
+  }  
+
+  return getTotalPrice();
+};
+
+
+ // Check and reserve on the payment page after React updates its selection.
+const checkMachineBeforePay = async () => true;
+
+const generateQR = (amount = getPaymentTotal()) => {
+  
+
+  const phone = "0909890860"; // 👈 ใส่เบอร์คุณตรงนี้
+
+  return `https://promptpay.io/${phone}/${amount}.png`;
+};
+
+const resetOptions = () => {  // เพื่อคืนค่าราคาเป็น 0 บาท ตอนย้อนกลับ
+  setTempOption(null); 
+  setAromaOption(null);
+  setProgramPrice(0);
+};
+
+
+const buildCommand = () => {
+  return {
+    program: program,
+    tempPulse: getTempPulse( 
+      program,  tempOption,  selectedMachineConfig
+    ),
+    aromaPulse: getAromaPulse(aromaOption)
+  };
+};
+
+const startTempMap = {    // จำนวนพัลส์ให้กลับไปเริ่ม 0 องศา
+      1: 3,  // setProgram 1
+      2: 1,  // setProgram 2      
+      3: 2,  // setProgram 3
+      4: 3,  // setProgram 4      
+      5: 3,  // setProgram 5
+      6: 0,  // setProgram 6      
+      7: 3,  // setProgram 7
+      8: 3,  // setProgram 8            
+      9: 0,   // setProgram 9
+      10: null 
+    };
+  
+
+const [tempSelected, setTempSelected] = useState(null);
+const [aromaSelected, setAromaSelected] = useState(null);
+
+
+// แก้ MQTT Disconnected โดยต้ดเอา UseEffect มาอยู่ก่อน return
+
+
+
+
+  useEffect(() => {
+
+    const mqtt = mqttClient;   
+    mqtt.on("connect", () => {
+      console.log("MQTT Connected");
+      setStatus("Connected");
+
+      mqtt.subscribe("laundry/+/state");
+      mqtt.subscribe("laundry/+/status");
+    });
+
+    mqtt.on("message", (topic, message) => {
+      const parts = topic.split("/");
+      const type = parts[2]?.toUpperCase();
+      console.log(`[${type}] ${parts[1]} = ${message.toString()}`);
+    });
+
+    mqtt.on("error", (err) => {
+      console.log("MQTT error:", err);
+    });
+
+    setClient(mqtt);
+
+    return () => {
+  // ไม่ต้องปิด mqttClient เพราะใช้ร่วมกันทั้งโปรแกรม
+};
+
+    // return () => {
+    //   mqtt.end();
+    // };
+  }, []);
+
+  const buildPaymentSelection = () => {
+const machine = selectedMachine;
+const paymentProgram =
+        mode === "dry" && selectedMachine === "machine5"
+          ? dry1program
+          : mode === "dry" && selectedMachine === "machine6"
+          ? dry2program
+          : mode === "dry" && selectedMachine === "machine7"
+          ? dry3program
+          : mode === "dry" && selectedMachine === "machine8"
+          ? dry4program
+          : program;
+
+
+      const paymentTempPulse =
+  mode === "dry" && selectedMachine === "machine5"
+    ? 0
+    : getTempPulse(program, tempOption, selectedMachineConfig);
+
+      const paymentAromaPulse =
+        mode === "dry" && selectedMachine === "machine5"
+          ? 0
+          : getAromaPulse(aromaOption);
+
+        const amount = getPaymentTotal();// เดิม = priceMap[program];  // ก่อนหน้าใช้โค้ด const amount = priceMap[program] || 40; หมายถึง ถ้าไม่มีค่าใน mapPrice ใช้ค่า default นี้คือ 40
+      // if(!amount){
+      //   alert("โปรแกรมนี้ยังไม่ตั้งราคา");  // if นี้ ทำใหม่อีกแบบเลยคือยกเลิก default 40 เป็นว่าถ้ายังไม่กำหนดราคาก็ขึ้น "โปรแกรมนี้ยังไม่ตั้งราคา"
+      //   return;
+      // }
+
+      
+return (
+mode === "dry"
+            ? {
+                machine,
+                amount,
+                type: "dry",
+                program: paymentProgram,
+                temperatureOption:
+                  selectedMachine === "machine6"
+                    ? dry2TemperatureOption
+                    : selectedMachine === "machine7"
+                    ? dry3TemperatureOption
+                    : selectedMachine === "machine8"
+                    ? dry4TemperatureOption
+                    : dry1TemperatureOption,
+
+                wrinkleOption:
+                  selectedMachine === "machine6"
+                    ? dry2WrinkleOption
+                    : selectedMachine === "machine7"
+                    ? dry3WrinkleOption
+                    : selectedMachine === "machine8"
+                    ? dry4WrinkleOption
+                    : dry1WrinkleOption,
+
+              }
+            : {
+                machine,
+                amount,
+                type: "wash",
+                program: paymentProgram,
+                tempPulse: paymentTempPulse,
+                aromaPulse: paymentAromaPulse,
+              }
+);
+};
+
+const beginPayment = async () => {
+    const res = await fetch(`${PAYMENT_API}/payments/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildPaymentSelection()),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || "สร้างรายการชำระไม่สำเร็จ");
+    setReservedUntil(data.reservedUntil);
+    return data;
+  };
+
+  const confirmWash = async (file, session) => {
+    const form = new FormData();
+    form.append("slip", file);
+    const checked = await fetch(`${PAYMENT_API}/payments/${session.txid}/slip`, {
+      method: "POST", body: form, signal: AbortSignal.timeout(90000)
+    });
+    const payment = await checked.json();
+    if (!checked.ok || !payment.success) {
+      throw new Error(payment.message || "ตรวจชำระไม่ผ่าน กรุณาอย่าโอนซ้ำ");
+    }
+    const started = await fetch(`${PAYMENT_API}/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ txid: session.txid }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const result = await started.json();
+    if (!started.ok || !result.success) {
+      throw new Error(result.message || "ตรวจชำระผ่านแล้ว แต่ยังยืนยันการสั่งเครื่องไม่ได้ กรุณาอย่าโอนซ้ำ");
+    }
+    return result;
+  };
+
+const finishWash = (machine) => {
+  if (!client) return;
+
+  client.publish(`laundry/${machine}/finish`, "done");
+
+  console.log("Finish pressed:", machine);
+
+  setStep(1);
+  setMode(null);
+};
+
+
+
+
+  
+
+
+return (
+  <div className="laundry-app">
+    <header className="laundry-header">
+      <div className="laundry-brand">
+        <div className="laundry-logo">🫧</div>
+        <div>
+          <h1>Smart Laundry</h1>
+          <p>บริการซักอบอัจฉริยะ สะดวกทุกเวลา</p>
+        </div>
+      </div>
+
+      <div className="laundry-status">
+        <span
+          className={`laundry-dot ${
+            status === "Connected" ? "online" : ""
+          }`}
+        />
+        {status === "Connected"
+          ? "ระบบเชื่อมต่อแล้ว"
+          : "กำลังเชื่อมต่อระบบ"}
+      </div>
+    </header>
+
+    <main className="laundry-main">
+
+      <div className="laundry-intro">
+        <span className="laundry-eyebrow">
+          SELF SERVICE LAUNDRY
+        </span>
+        <h2>{pageTitle}</h2>
+        <p>{pageDescription}</p>
+      </div>
+
+
+      <div className="laundry-panel">
+
+
+{/* STEP 1 */}
+{step === 1 && (
+  <>
+    <ServiceSelection
+      onSelectWash={() => {
+        setMode("wash");
+        setSelectedMachine(null);
+        setStep(1_1);
+      }}
+      onSelectDry={() => {
+        setMode("dry");
+        setSelectedMachine(null);
+        setStep(1_2);
+      }}
+    />
+
+
+{SHOW_TEST_BUTTONS && (
+  <div className="test-controls">
+
+    <br />
+<button onClick={() => finishWash("machine1")}>
+  ซักเสร็จ เครื่อง 1
+</button>
+
+<button onClick={() => finishWash("machine2")}>
+  ซักเสร็จ เครื่อง 2
+</button>
+
+<button onClick={() => finishWash("machine3")}>
+  ซักเสร็จ เครื่อง 3
+</button>
+
+<button onClick={() => finishWash("machine4")}>
+  ซักเสร็จ เครื่อง 4
+</button>
+
+    <br />
+<button onClick={() => finishWash("machine5")}>
+  อบเสร็จ เครื่อง 1
+</button>
+
+
+<button onClick={() => finishWash("machine6")}>
+  อบเสร็จ เครื่อง 2
+</button>
+
+<button onClick={() => finishWash("machine7")}>
+  อบเสร็จ เครื่อง 3
+</button>
+
+<button onClick={() => finishWash("machine8")}>
+  อบเสร็จ เครื่อง 4
+</button>
+
+  </div>
+)}
+
+  </>
+)}
+
+{/* STEP 1_1 */}
+{step === 1_1 && (
+  <WashMachineSelection
+    selectedMachine={selectedMachine}
+    setSelectedMachine={setSelectedMachine}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 1_2 */}
+{step === 1_2 && (
+  <DryMachineSelection
+    selectedMachine={selectedMachine}
+    setSelectedMachine={setSelectedMachine}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 2 */}
+{step === 2 && (
+  <WashPriceSelection
+    onSelect20={() => {
+      setPrices(20);
+      setStep(2_1);
+    }}
+
+    onSelect30={() => {
+      setPrices(30);
+      setStep(2_2);
+    }}
+
+    onSelect50={() => {
+      setPrices(50);
+      setStep(2_3);
+      setProgram(10);
+      setProgramPrice(50);
+    }}
+
+    onBack={() => setStep(1_1)}
+  />
+)}
+
+{/* STEP 2_1 */}
+{step === 2_1 && (
+  <Wash20Selection
+    program={program}
+    programNameMap={configProgramNameMap}
+    getTotalPrice={getTotalPrice}
+    setProgram={setProgram}
+    setProgramPrice={setProgramPrice}
+    setSpin={setSpin}
+    setAroma={setAroma}
+    resetOptions={resetOptions}
+    setStep={setStep}
+    buildCommand={buildCommand}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+    priceGroupPrograms={
+      selectedMachineConfig?.config?.priceGroups?.[20] ?? [4, 6]
+    }
+  />
+)}
+
+
+{/* STEP 2_2 */}
+{step === 2_2 && (
+  <Wash30ProgramSelection
+    programNameMap={configProgramNameMap}
+    setProgram={setProgram}
+    setProgramPrice={setProgramPrice}
+    setStep={setStep}
+    resetOptions={resetOptions}
+  />
+)}
+
+{/* STEP 2_2_1 (ซัก) */}
+{step === 2_2_1 && mode === "wash" && (
+  <Wash30Options
+    program={program}
+    programNameMap={configProgramNameMap}
+    tempOption={tempOption}
+    setTempOption={setTempOption}
+    tempOptionsMap={configTempOptionsMap}
+    tempShowOptionsMap={tempShowOptionsMap}
+    tempPriceMap={configTempPriceMap}
+    aromaOption={aromaOption}
+    setAromaOption={setAromaOption}
+    aromaOptionsMap={configAromaOptionsMap}
+    getTotalPrice={getTotalPrice}
+    resetOptions={resetOptions}
+    setProgram={setProgram}
+    setStep={setStep}
+    buildCommand={buildCommand}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+
+{/* STEP 2_3 */}
+{step === 2_3 && (
+  <Wash50Selection
+    program={program}
+    programNameMap={configProgramNameMap}
+    getTotalPrice={getTotalPrice}
+
+    aromaOption={aromaOption}
+    setAromaOption={setAromaOption}
+    aromaOptionsMap={configAromaOptionsMap}
+
+    resetOptions={resetOptions}
+    setProgram={setProgram}
+    setStep={setStep}
+    buildCommand={buildCommand}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+{/* STEP 3 */}
+{step === 3 && (
+  <DrySelection
+    resetOptions={resetOptions}
+    setProgram={setProgram}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_1 */}
+{step === 3_1 && (
+  <Dry1Selection
+    dry1price={dry1price}
+    setDry1Prices={setDry1Prices}
+    setDry1Program={setDry1Program}
+    resetOptions={resetOptions}
+    setProgram={setProgram}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_1_1 */}
+{step === 3_1_1 && (
+  <Dry1ProgramSelection
+    dry1price={dry1price}
+    setDry1Program={setDry1Program}
+    setDry1TemperatureOption={setDry1TemperatureOption}
+    setDry1WrinkleOption={setDry1WrinkleOption}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_1_2 */}
+{step === 3_1_2 && (
+  <Dry1Options
+    dry1price={dry1price}
+    dry1program={dry1program}
+    dry1TemperatureOption={dry1TemperatureOption}
+    setDry1TemperatureOption={setDry1TemperatureOption}
+    dry1WrinkleOption={dry1WrinkleOption}
+    setDry1WrinkleOption={setDry1WrinkleOption}
+    getDry1TotalPrice={getDry1TotalPrice}
+    setStep={setStep}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+
+{/* STEP 3_2 */}
+{step === 3_2 && (
+  <Dry2Selection
+    setDry2Prices={setDry2Prices}
+    setDry2Program={setDry2Program}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_2_1 */}
+{step === 3_2_1 && (
+  <Dry2ProgramSelection
+    dry2price={dry2price}
+    setDry2Program={setDry2Program}
+    setDry2TemperatureOption={setDry2TemperatureOption}
+    setDry2WrinkleOption={setDry2WrinkleOption}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_2_2 */}
+{step === 3_2_2 && (
+  <Dry2Options
+    dry2price={dry2price}
+    dry2program={dry2program}
+    dry2TemperatureOption={dry2TemperatureOption}
+    setDry2TemperatureOption={setDry2TemperatureOption}
+    dry2WrinkleOption={dry2WrinkleOption}
+    setDry2WrinkleOption={setDry2WrinkleOption}
+    getDry2TotalPrice={getDry2TotalPrice}
+    setStep={setStep}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+
+
+{/* STEP 3_3 */}
+{step === 3_3 && (
+  <Dry3Selection
+    setDry3Prices={setDry3Prices}
+    setDry3Program={setDry3Program}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_3_1 */}
+{step === 3_3_1 && (
+  <Dry3ProgramSelection
+    dry3price={dry3price}
+    setDry3Program={setDry3Program}
+    setDry3TemperatureOption={setDry3TemperatureOption}
+    setDry3WrinkleOption={setDry3WrinkleOption}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_3_2 */}
+{step === 3_3_2 && (
+  <Dry3Options
+    dry3price={dry3price}
+    dry3program={dry3program}
+    dry3TemperatureOption={dry3TemperatureOption}
+    setDry3TemperatureOption={setDry3TemperatureOption}
+    dry3WrinkleOption={dry3WrinkleOption}
+    setDry3WrinkleOption={setDry3WrinkleOption}
+    getDry3TotalPrice={getDry3TotalPrice}
+    setStep={setStep}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+
+{/* STEP 3_4 */}
+{step === 3_4 && (
+  <Dry4Selection
+    dry4price={dry4price}
+    setDry4Prices={setDry4Prices}
+    setDry4Program={setDry4Program}
+    resetOptions={resetOptions}
+    setProgram={setProgram}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_4_1 */}
+{step === 3_4_1 && (
+  <Dry4ProgramSelection
+    dry4price={dry4price}
+    setDry4Program={setDry4Program}
+    setDry4TemperatureOption={setDry4TemperatureOption}
+    setDry4WrinkleOption={setDry4WrinkleOption}
+    setStep={setStep}
+  />
+)}
+
+{/* STEP 3_4_2 */}
+{step === 3_4_2 && (
+  <Dry4Options
+    dry4price={dry4price}
+    dry4program={dry4program}
+    dry4TemperatureOption={dry4TemperatureOption}
+    setDry4TemperatureOption={setDry4TemperatureOption}
+    dry4WrinkleOption={dry4WrinkleOption}
+    setDry4WrinkleOption={setDry4WrinkleOption}
+    getDry4TotalPrice={getDry4TotalPrice}
+    setStep={setStep}
+    checkMachineBeforePay={checkMachineBeforePay}
+    STEP_QR={STEP_QR}
+  />
+)}
+
+{step === STEP_QR && (
+  <QRPayment
+    generateQR={generateQR}
+    getTotalPrice={getPaymentTotal}
+    setProgram={setProgram}
+    setStep={setStep}
+    setProgramPrice={setProgramPrice}
+    resetOptions={resetOptions}
+    beginPayment={beginPayment}
+    confirmWash={confirmWash}
+    reservedUntil={reservedUntil}
+  />
+)}
+      </div>
+    </main>
+  </div>
+  );
+}
+
+export default App;

@@ -1,0 +1,8 @@
+{
+  "laundry-server/payment-time-verify.cjs": false,
+  "laundry-server/payment-time-api.cjs": false,
+  "laundry-server/payment-time.test.cjs": false,
+  "laundry-server/payment-bridge.cjs": true,
+  "src/components/QRPayment.jsx": true,
+  "src/App.jsx": true
+}

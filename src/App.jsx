@@ -63,9 +63,13 @@ const [reservedUntil, setReservedUntil] = useState(null);
 
 useEffect(() => {
   if (selectedMachine) {
-    console.log("✅ SELECTED MACHINE:", selectedMachine);
+    console.log("===== MACHINE PROFILE TEST =====");
+    console.log("Machine ID:", selectedMachine);
+    console.log("Machine Type:", mode);
+    console.log("Program Profile:", selectedMachineProfile);
+    console.log("================================");
   }
-}, [selectedMachine]);
+}, [selectedMachine, mode, selectedMachineProfile]);
 
 const selectedMachineConfig =
   getMachineConfigByProfile(selectedMachineProfile) ??

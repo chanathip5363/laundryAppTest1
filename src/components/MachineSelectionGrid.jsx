@@ -1,6 +1,5 @@
 
 import { useEffect, useState } from "react";
-import getMachineConfigByProfile from "../config/getMachineConfigByProfile";
 import MachineRunTime from "./MachineRunTime";
 
 
@@ -135,32 +134,14 @@ export default function MachineSelectionGrid({
 
     const machine = machineStatus[id];
 
-    if (
-      type === "wash" &&
-      machine &&
-      !getMachineConfigByProfile(machine.program_profile)
-    ) {
+    // During profile-selection testing, only require a profile value.
+    // The profile does not need a real machine-control configuration yet.
+    if (machine && !machine.program_profile) {
       return {
-        label: "ยังไม่รองรับโปรแกรม",
+        label: "ยังไม่ได้กำหนด Profile",
         className: "unknown",
         available: false,
       };
-    }
-
-    if (type === "dry" && machine) {
-      const legacyDryMachines = ["machine5", "machine6", "machine7", "machine8"];
-      const profile = getMachineConfigByProfile(machine.program_profile);
-
-      if (
-        (!profile || profile.service !== "dry") &&
-        !legacyDryMachines.includes(id)
-      ) {
-        return {
-          label: "ยังไม่รองรับโปรแกรม",
-          className: "unknown",
-          available: false,
-        };
-      }
     }
 
     if (!machine || machine.status !== "ONLINE") {
@@ -206,6 +187,7 @@ export default function MachineSelectionGrid({
       id: machine.machine,
       name: machine.display_name || machine.machine,
       model: machine.model || "",
+      machine_type: machine.machine_type,
       program_profile: machine.program_profile,
       nextStep: machines?.find((item) => item.id === machine.machine)?.nextStep,
     }));

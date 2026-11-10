@@ -3,6 +3,22 @@ import MachineRunTime from "../components/MachineRunTime";
 
 const API = "https://api.the-oasis-living.com";
 
+// Profile ใช้แยก Firmware สำหรับการทดสอบ โดยไม่ผูกกับยี่ห้อเครื่อง
+const MACHINE_PROFILES = {
+  wash: [
+    ["toshibaA", "toshibaA (Toshiba)"],
+    ["ESP32_LG", "ESP32_LG"],
+    ["ESP32_Samsung", "ESP32_Samsung"],
+    ["ESP32_TCL", "ESP32_TCL"],
+  ],
+  dry: [
+    ["ESP32_DryHaier", "ESP32_DryHaier"],
+    ["ESP32_DryLG", "ESP32_DryLG"],
+    ["ESP32_DrySamsung", "ESP32_DrySamsung"],
+    ["ESP32_DryTCL", "ESP32_DryTCL"],
+  ],
+};
+
 
 const thb = (satang) => (Number(satang || 0) / 100).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const decimal = (value, digits = 2) => Number(value || 0).toLocaleString("th-TH", { maximumFractionDigits: digits });
@@ -782,7 +798,10 @@ export default function AdminApp() {
                 <select
                   id="new-machine-type"
                   value={newMachineType}
-                  onChange={(e) => setNewMachineType(e.target.value)}
+                  onChange={(e) => {
+                    setNewMachineType(e.target.value);
+                    setNewMachineProfile("");
+                  }}
                   style={{ display: "block", width: "100%", marginBottom: 12 }}
                 >
                   <option value="wash">เครื่องซัก</option>
@@ -809,14 +828,17 @@ export default function AdminApp() {
                 />
 
                 <label htmlFor="new-machine-profile">Program Profile</label>
-                <input
+                <select
                   id="new-machine-profile"
                   value={newMachineProfile}
                   onChange={(e) => setNewMachineProfile(e.target.value)}
-                  placeholder="เช่น toshibaA (ถ้ามี)"
-                  maxLength={100}
                   style={{ display: "block", width: "100%", marginBottom: 12 }}
-                />
+                >
+                  <option value="">-- ยังไม่กำหนด Profile --</option>
+                  {(MACHINE_PROFILES[newMachineType] || []).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
 
                 <button type="submit" disabled={creatingMachine || machinesLoading}>
                   {creatingMachine ? "กำลังบันทึก..." : "เพิ่มเครื่องใหม่"}
@@ -854,11 +876,29 @@ export default function AdminApp() {
                       />
                     </label>
                     <label>Program Profile
-                      <input
+                      <select
                         value={editMachineProfile}
                         onChange={e => setEditMachineProfile(e.target.value)}
-                        maxLength={100}
-                      />
+                      >
+                        <option value="">-- ยังไม่กำหนด Profile --</option>
+                        {(() => {
+                          const machineType = machines.find(
+                            machine => machine.machine === editingMachine
+                          )?.machine_type;
+                          const profiles = MACHINE_PROFILES[machineType] || [];
+                          const currentIsListed = profiles.some(
+                            ([value]) => value === editMachineProfile
+                          );
+                          return <>
+                            {editMachineProfile && !currentIsListed && (
+                              <option value={editMachineProfile}>{editMachineProfile} (ค่าเดิม)</option>
+                            )}
+                            {profiles.map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </>;
+                        })()}
+                      </select>
                     </label>
                     {editMachineError && (
                       <p role="alert">{editMachineError}</p>
