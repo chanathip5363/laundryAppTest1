@@ -94,15 +94,25 @@ function createMqttManager({
       subscribedTopics.delete(topic);
     }
 
+    // Attempt each topic independently. A broker rejection for one topic
+    // must not prevent subscriptions to other topics (especially status).
     for (const topic of added) {
-      await new Promise((resolve, reject) =>
-        client.subscribe(topic, { qos: 1 }, (err, granted) =>
-          err || !granted?.some(g => g.qos <= 2)
-            ? reject(err || new Error("Subscribe rejected: " + topic))
-            : resolve()
-        )
-      );
-      subscribedTopics.add(topic);
+      try {
+        await new Promise((resolve, reject) =>
+          client.subscribe(topic, { qos: 1 }, (err, granted) => {
+            const grant = Array.isArray(granted) ? granted[0] : null;
+            if (err) return reject(err);
+            if (!grant || grant.qos === 128) {
+              return reject(new Error("Subscribe rejected: " + topic));
+            }
+            resolve();
+          })
+        );
+        subscribedTopics.add(topic);
+        console.log("[MQTT NEW] Subscribed:", topic);
+      } catch (err) {
+        console.error("[MQTT NEW] Subscribe failed:", topic, err.message);
+      }
     }
   }
 
