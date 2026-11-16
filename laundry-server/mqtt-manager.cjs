@@ -134,6 +134,7 @@ function createMqttManager({
       );
     });
     client.on("message", (topic, payload) => {
+      console.log("[MQTT RX]", topic, payload.toString());
       const match = /^laundry\/([^/]+)\/([^/]+)\/(state|status|telemetry)$/.exec(topic);
       if (!match || !messageHandler) return;
       try {
