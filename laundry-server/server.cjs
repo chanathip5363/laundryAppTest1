@@ -64,6 +64,11 @@ app.use("/admin", createAdminRouter("database.db", () => {
     throw new Error("Unsupported admin command");
   }
   await sendNewMqttCommand(shopId, machineId, command);
+}, async (shopId, machineId, profile) => {
+  if (!USE_NEW_MQTT || !newMqtt) {
+    throw new Error("New MQTT is not enabled");
+  }
+  await newMqtt.publishProfile(shopId, machineId, profile);
 }));
 
 const usedTx = new Set();

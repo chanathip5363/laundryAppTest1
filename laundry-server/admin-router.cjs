@@ -5,7 +5,12 @@ const { verifyPassword } = require("./admin-auth.cjs");
 
 const SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
-function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {}, sendMqttCommand) {
+function createAdminRouter(
+  dbPath = "database.db",
+  onMachinesChanged = () => {},
+  sendMqttCommand,
+  sendMqttProfile
+) {
   const router = express.Router();
   const allowedOrigins = new Set([
     "https://laundry-app-test1.vercel.app"
@@ -366,6 +371,18 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {},
       transactionStarted = false;
       onMachinesChanged();
 
+      if (typeof sendMqttProfile === "function") {
+        try {
+          await sendMqttProfile(shopId, machine, program_profile?.trim() || null);
+        } catch (mqttError) {
+          console.error("Machine profile MQTT publish failed:", mqttError);
+          return res.status(502).json({
+            error: "Machine was registered, but Profile could not be published",
+            machine
+          });
+        }
+      }
+
       return res.status(201).json({
         machine: {
           machine,
@@ -471,6 +488,18 @@ function createAdminRouter(dbPath = "database.db", onMachinesChanged = () => {},
 
       await run("COMMIT");
       inTransaction = false;
+
+      if (typeof sendMqttProfile === "function") {
+        try {
+          await sendMqttProfile(shopId, machine, program_profile?.trim() || null);
+        } catch (mqttError) {
+          console.error("Machine profile MQTT publish failed:", mqttError);
+          return res.status(502).json({
+            error: "Machine was updated, but Profile could not be published",
+            machine
+          });
+        }
+      }
 
       return res.json({
         machine,

@@ -16,6 +16,12 @@ function commandTopic(shopId, machineId) {
   return `laundry/${shopId}/${machineId}/cmd`;
 }
 
+function profileTopic(shopId, machineId) {
+  assertIdentifier(shopId, "shopId");
+  assertIdentifier(machineId, "machineId");
+  return `laundry/${shopId}/${machineId}/profile`;
+}
+
 function validateCommand(command) {
   if (!command || typeof command !== "object" || Array.isArray(command)) {
     throw new Error("Invalid command");
@@ -143,6 +149,25 @@ function createMqttManager({
     });
   }
 
+  // Profile is configuration metadata, separate from machine-control commands.
+  // Retained so an ESP32 receives the latest profile after reconnecting.
+  function publishProfile(shopId, machineId, profile) {
+    if (!client || !client.connected) {
+      return Promise.reject(new Error("MQTT broker is not connected"));
+    }
+    if (profile !== null && typeof profile !== "string") {
+      return Promise.reject(new Error("Invalid machine profile"));
+    }
+    const topic = profileTopic(shopId, machineId);
+    const payload = profile == null ? "" : profile.trim();
+    return new Promise((resolve, reject) => {
+      client.publish(topic, payload, { qos: 1, retain: true }, err => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+
   function onMessage(handler) {
     if (handler !== null && typeof handler !== "function") {
       throw new Error("Invalid MQTT message handler");
@@ -155,7 +180,7 @@ function createMqttManager({
     client = null;
   }
 
-  return { connect, publishCommand, onMessage, close, syncSubscriptions, isConnected: () => Boolean(client && client.connected) };
+  return { connect, publishCommand, publishProfile, onMessage, close, syncSubscriptions, isConnected: () => Boolean(client && client.connected) };
 }
 
-module.exports = { createMqttManager, commandTopic, validateCommand };
+module.exports = { createMqttManager, commandTopic, profileTopic, validateCommand };
