@@ -178,6 +178,18 @@ export default function AdminApp() {
   const [pricingError, setPricingError] = useState("");
   const [pricingSuccess, setPricingSuccess] = useState("");
 
+  // Global pricing states
+  const [globalPricingList, setGlobalPricingList] = useState([]);
+  const [globalPricingDraft, setGlobalPricingDraft] = useState(null);
+  const [globalPricingLoading, setGlobalPricingLoading] = useState(false);
+  const [globalPricingSaving, setGlobalPricingSaving] = useState(false);
+  const [globalPricingError, setGlobalPricingError] = useState("");
+  const [globalPricingSuccess, setGlobalPricingSuccess] = useState("");
+  const [globalMachineType, setGlobalMachineType] = useState("wash");
+  const [globalModel, setGlobalModel] = useState("");
+  const [globalProfile, setGlobalProfile] = useState("");
+
+
   function updatePricingField(field, value) {
     setPricingDraft(previous => ({ ...previous, [field]: value }));
     setPricingSuccess("");
