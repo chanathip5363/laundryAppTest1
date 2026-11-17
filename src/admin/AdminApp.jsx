@@ -273,6 +273,135 @@ export default function AdminApp() {
     }
   }
 
+
+  async function loadGlobalPricing() {
+    setGlobalPricingError("");
+    setGlobalPricingSuccess("");
+    setGlobalPricingLoading(true);
+
+    try {
+      const response = await fetch(`${API}/admin/pricing/global`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "โหลดราคากลางไม่สำเร็จ");
+      }
+
+      setGlobalPricingList(data.pricing || []);
+
+    } catch (err) {
+      setGlobalPricingError(err.message);
+    } finally {
+      setGlobalPricingLoading(false);
+    }
+  }
+
+  function selectGlobalPricing(row) {
+    setGlobalMachineType(row.machine_type);
+    setGlobalModel(row.model);
+    setGlobalProfile(row.program_profile);
+
+    const draft = {
+      ...row.pricing,
+      priceGroups: Object.fromEntries(
+        Object.entries(row.pricing.priceGroups).map(([price, ids]) => [
+          price,
+          Array.isArray(ids) ? ids.join(", ") : ids
+        ])
+      ),
+    };
+
+    if (row.machine_type === "dry") {
+      draft.temperatureRule = {
+        ...draft.temperatureRule,
+        programs: Array.isArray(draft.temperatureRule.programs)
+          ? draft.temperatureRule.programs.join(", ")
+          : draft.temperatureRule.programs,
+      };
+    }
+
+    setGlobalPricingDraft(draft);
+    setGlobalPricingError("");
+    setGlobalPricingSuccess("");
+  }
+
+  async function saveGlobalPricing(event) {
+    event.preventDefault();
+
+    if (!globalPricingDraft || globalPricingSaving) return;
+
+    setGlobalPricingError("");
+    setGlobalPricingSuccess("");
+    setGlobalPricingSaving(true);
+
+    try {
+      if (!globalModel.trim() || !globalProfile.trim()) {
+        throw new Error("กรุณาระบุ Model และ Profile");
+      }
+
+      const groups = Object.fromEntries(
+        Object.entries(globalPricingDraft.priceGroups).map(([price, ids]) => [
+          price,
+          typeof ids === "string" ? parseProgramIds(ids) : ids
+        ])
+      );
+
+      const allIds = Object.values(groups).flat();
+
+      if (new Set(allIds).size !== allIds.length) {
+        throw new Error("หมายเลขโปรแกรมซ้ำกันระหว่างกลุ่มราคา");
+      }
+
+      const pricing = {
+        ...globalPricingDraft,
+        priceGroups: groups
+      };
+
+      if (globalMachineType === "dry") {
+        pricing.temperatureRule = {
+          ...pricing.temperatureRule,
+          programs: typeof pricing.temperatureRule.programs === "string"
+            ? parseProgramIds(pricing.temperatureRule.programs)
+            : pricing.temperatureRule.programs,
+        };
+      }
+
+      const response = await fetch(`${API}/admin/pricing/global`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          machine_type: globalMachineType,
+          model: globalModel.trim(),
+          program_profile: globalProfile.trim(),
+          pricing,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "บันทึกราคากลางไม่สำเร็จ");
+      }
+
+      setGlobalPricingDraft(pricing);
+      setGlobalPricingSuccess("บันทึกราคากลางเรียบร้อยแล้ว");
+
+      await loadGlobalPricing();
+
+    } catch (err) {
+      setGlobalPricingError(err.message);
+    } finally {
+      setGlobalPricingSaving(false);
+    }
+  }
+
   function priceNumberInput(value, onChange, label) {
     return (
       <label style={{ display: "block", marginBottom: 8 }}>
@@ -733,7 +862,234 @@ export default function AdminApp() {
           <p>ผู้ใช้งาน: {user.username}</p>
           <p>สิทธิ์: {user.role}</p>
 
+
           <DashboardPanel token={token} shops={shops} />
+
+        <section style={{ border: "1px solid #888", borderRadius: 8, padding: 16, margin: "20px 0" }}>
+          <h3>จัดการราคากลาง (Global Pricing)</h3>
+          <p>ราคาพื้นฐานที่ใช้ร่วมกันทุกสาขา เมื่อร้านไม่มีราคา Override</p>
+
+          <button
+            type="button"
+            onClick={loadGlobalPricing}
+            disabled={globalPricingLoading}
+          >
+            {globalPricingLoading ? "กำลังโหลด..." : "โหลดรายการราคากลาง"}
+          </button>
+
+          {globalPricingError && (
+            <p role="alert" style={{ color: "red" }}>{globalPricingError}</p>
+          )}
+          {globalPricingSuccess && (
+            <p role="status" style={{ color: "green" }}>{globalPricingSuccess}</p>
+          )}
+
+          <h4>รายการราคากลาง</h4>
+          {globalPricingList.length === 0 ? (
+            <p>ยังไม่มีรายการ หรือยังไม่ได้โหลดข้อมูล</p>
+          ) : (
+            <ul>
+              {globalPricingList.map((row, index) => (
+                <li key={`${row.machine_type}-${row.model}-${row.program_profile}-${index}`}>
+                  {row.machine_type === "wash" ? "ซัก" : "อบ"}
+                  {" — "}{row.model}
+                  {" — "}{row.program_profile}
+                  {" "}
+                  <button type="button" onClick={() => selectGlobalPricing(row)}>
+                    แก้ไข
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {globalPricingDraft && (
+            <form onSubmit={saveGlobalPricing}>
+              <hr />
+              <h4>แก้ไขราคากลาง</h4>
+
+              <p>ประเภท: {globalMachineType === "wash" ? "เครื่องซัก" : "เครื่องอบ"}</p>
+
+              <label style={{ display: "block", marginBottom: 10 }}>
+                Model
+                <input
+                  value={globalModel}
+                  onChange={event => setGlobalModel(event.target.value)}
+                  required
+                  style={{ display: "block", width: "100%" }}
+                />
+              </label>
+
+              <label style={{ display: "block", marginBottom: 10 }}>
+                Program Profile
+                <input
+                  value={globalProfile}
+                  onChange={event => setGlobalProfile(event.target.value)}
+                  required
+                  style={{ display: "block", width: "100%" }}
+                />
+              </label>
+
+              <h4>กลุ่มราคาและหมายเลขโปรแกรม</h4>
+
+              {Object.entries(globalPricingDraft.priceGroups).map(([price, programs]) => (
+                <div key={price} style={{ marginBottom: 12 }}>
+                  <label>
+                    ราคา (บาท)
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={price}
+                      onChange={event => {
+                        const nextPrice = event.target.value;
+                        if (!/^\d+(?:\.\d{0,2})?$/.test(nextPrice)) return;
+                        if (nextPrice !== price &&
+                            Object.hasOwn(globalPricingDraft.priceGroups, nextPrice)) return;
+
+                        const next = {};
+                        Object.entries(globalPricingDraft.priceGroups).forEach(([key, value]) => {
+                          next[key === price ? nextPrice : key] = value;
+                        });
+                        setGlobalPricingDraft(previous => ({
+                          ...previous, priceGroups: next
+                        }));
+                      }}
+                      style={{ display: "block", width: 120 }}
+                    />
+                  </label>
+                  <label>
+                    หมายเลขโปรแกรม (คั่นด้วย ,)
+                    <input
+                      value={Array.isArray(programs) ? programs.join(", ") : programs}
+                      onChange={event => setGlobalPricingDraft(previous => ({
+                        ...previous,
+                        priceGroups: {
+                          ...previous.priceGroups,
+                          [price]: event.target.value
+                        }
+                      }))}
+                      style={{ display: "block", width: "100%" }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = { ...globalPricingDraft.priceGroups };
+                      delete next[price];
+                      setGlobalPricingDraft(previous => ({
+                        ...previous, priceGroups: next
+                      }));
+                    }}
+                  >
+                    ลบกลุ่มราคา
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const price = window.prompt("ราคาเริ่มต้นของกลุ่มใหม่ (บาท)");
+                  if (price === null) return;
+                  const amount = Number(price);
+                  if (!/^\d+(?:\.\d{1,2})?$/.test(price) || amount <= 0 ||
+                      Object.hasOwn(globalPricingDraft.priceGroups, String(amount))) {
+                    setGlobalPricingError("ราคาไม่ถูกต้องหรือมีกลุ่มราคานี้แล้ว");
+                    return;
+                  }
+                  setGlobalPricingDraft(previous => ({
+                    ...previous,
+                    priceGroups: { ...previous.priceGroups, [String(amount)]: "" }
+                  }));
+                  setGlobalPricingError("");
+                }}
+              >
+                + เพิ่มกลุ่มราคา
+              </button>
+
+              {globalMachineType === "wash" ? (
+                <>
+                  <h4>ค่าอุณหภูมิซักเพิ่มเติม</h4>
+                  {Object.entries(globalPricingDraft.temperaturePrice).map(([temp, value]) => (
+                    <div key={temp}>
+                      {priceNumberInput(value, next => setGlobalPricingDraft(previous => ({
+                        ...previous,
+                        temperaturePrice: {
+                          ...previous.temperaturePrice,
+                          [temp]: next
+                        }
+                      })), `${temp}°C`)}
+                    </div>
+                  ))}
+                  <h4>ค่าน้ำหอม</h4>
+                  {priceNumberInput(globalPricingDraft.aromaPrice, next =>
+                    setGlobalPricingDraft(previous => ({
+                      ...previous, aromaPrice: next
+                    })), "น้ำหอม")}
+                </>
+              ) : (
+                <>
+                  <h4>ค่าอุณหภูมิอบเพิ่มเติม</h4>
+                  {Object.entries(globalPricingDraft.temperatureRule.prices).map(([option, value]) => (
+                    <div key={option}>
+                      {priceNumberInput(value, next => setGlobalPricingDraft(previous => ({
+                        ...previous,
+                        temperatureRule: {
+                          ...previous.temperatureRule,
+                          prices: {
+                            ...previous.temperatureRule.prices,
+                            [option]: next
+                          }
+                        }
+                      })), option)}
+                    </div>
+                  ))}
+                  <label>
+                    โปรแกรมที่ใช้ค่าอุณหภูมิเพิ่มเติม (คั่นด้วย ,)
+                    <input
+                      value={Array.isArray(globalPricingDraft.temperatureRule.programs)
+                        ? globalPricingDraft.temperatureRule.programs.join(", ")
+                        : globalPricingDraft.temperatureRule.programs}
+                      onChange={event => setGlobalPricingDraft(previous => ({
+                        ...previous,
+                        temperatureRule: {
+                          ...previous.temperatureRule,
+                          programs: event.target.value
+                        }
+                      }))}
+                      style={{ display: "block", width: "100%" }}
+                    />
+                  </label>
+                  <h4>ค่าป้องกันผ้ายับ</h4>
+                  {priceNumberInput(globalPricingDraft.wrinklePrice, next =>
+                    setGlobalPricingDraft(previous => ({
+                      ...previous, wrinklePrice: next
+                    })), "ป้องกันผ้ายับ")}
+                </>
+              )}
+
+              <p style={{ fontSize: 13 }}>
+                หมายเลขโปรแกรมต้องไม่ซ้ำกันระหว่างกลุ่มราคา
+              </p>
+
+              <button type="submit" disabled={globalPricingSaving}>
+                {globalPricingSaving ? "กำลังบันทึก..." : "บันทึกราคากลาง"}
+              </button>
+              {" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setGlobalPricingDraft(null);
+                  setGlobalPricingError("");
+                  setGlobalPricingSuccess("");
+                }}
+              >
+                ปิด
+              </button>
+            </form>
+          )}
+        </section>
 
           <div style={{ maxWidth: 480, margin: "0 auto" }}>
           <h3>เพิ่มร้านใหม่</h3>
