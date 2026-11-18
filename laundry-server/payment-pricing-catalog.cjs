@@ -29,29 +29,11 @@ async function getPricingCatalog(machineId, {
     let pricing = null;
     let pricingSource = null;
 
-    // 1. Shop + exact machine + Profile.
-    // 2. Shop + shared Profile (machine IS NULL).
-    if (machine.shop_id && machine.program_profile) {
-      const shopRow = await get(
-        `SELECT machine, pricing_json
-         FROM shop_machine_pricing
-         WHERE shop_id = ?
-           AND program_profile = ?
-           AND (machine = ? OR machine IS NULL)
-         ORDER BY CASE WHEN machine = ? THEN 0 ELSE 1 END
-         LIMIT 1`,
-        [machine.shop_id, machine.program_profile, machine.machine, machine.machine]
-      );
-
-      if (shopRow?.pricing_json) {
-        pricing = JSON.parse(shopRow.pricing_json);
-        pricingSource = shopRow.machine === machine.machine ? 'machine' : 'shop';
-      }
-    }
-
-    // 3. Global + exact Model + Profile.
-    // 4. Global + wildcard Model (*) + Profile.
-    if (!pricing && machine.machine_type && machine.program_profile) {
+    // 1. Global + exact Model + Profile.
+    // 2. Global + wildcard Model (*) + Profile.
+    // Global Pricing takes priority so Admin Global Pricing changes
+    // are reflected in the WebApp even when Shop Pricing rows exist.
+    if (machine.machine_type && machine.program_profile) {
       const modelKeys = machine.model && machine.model !== '*'
         ? [machine.model, '*']
         : ['*'];
@@ -69,6 +51,27 @@ async function getPricingCatalog(machineId, {
           pricingSource = modelKey === '*' ? 'global-wildcard' : 'global';
           break;
         }
+      }
+    }
+
+    // 3. Shop + exact machine + Profile.
+    // 4. Shop + shared Profile (machine IS NULL).
+    // Shop Pricing is used only when no matching Global Pricing exists.
+    if (!pricing && machine.shop_id && machine.program_profile) {
+      const shopRow = await get(
+        `SELECT machine, pricing_json
+         FROM shop_machine_pricing
+         WHERE shop_id = ?
+           AND program_profile = ?
+           AND (machine = ? OR machine IS NULL)
+         ORDER BY CASE WHEN machine = ? THEN 0 ELSE 1 END
+         LIMIT 1`,
+        [machine.shop_id, machine.program_profile, machine.machine, machine.machine]
+      );
+
+      if (shopRow?.pricing_json) {
+        pricing = JSON.parse(shopRow.pricing_json);
+        pricingSource = shopRow.machine === machine.machine ? 'machine' : 'shop';
       }
     }
 
