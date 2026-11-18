@@ -403,9 +403,9 @@ export default function AdminApp() {
       }
 
       setGlobalPricingDraft(pricing);
-      setGlobalPricingSuccess("บันทึกราคากลางเรียบร้อยแล้ว");
 
       await loadGlobalPricing();
+      setGlobalPricingSuccess("บันทึกราคากลางเรียบร้อยแล้ว");
 
     } catch (err) {
       setGlobalPricingError(err.message);
