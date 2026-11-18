@@ -744,6 +744,120 @@ function createAdminRouter(
     );
   });
 
+  // Global pricing catalog: list all model/profile defaults.
+  router.get("/pricing/global", requireAdmin, (req, res) => {
+    db.all(
+      `SELECT machine_type, model, program_profile, pricing_json, updated_at
+       FROM profile_pricing_v2
+       ORDER BY machine_type, model, program_profile`,
+      [],
+      (err, rows) => {
+        if (err) {
+          console.error("Global pricing read failed:", err);
+          return res.status(500).json({ error: "Global pricing read failed" });
+        }
+        try {
+          const pricing = rows.map(row => ({
+            machine_type: row.machine_type,
+            model: row.model,
+            program_profile: row.program_profile,
+            pricing: JSON.parse(row.pricing_json),
+            updated_at: row.updated_at,
+          }));
+          res.set("Cache-Control", "no-store");
+          return res.json({ success: true, pricing });
+        } catch (error) {
+          console.error("Global pricing JSON parse failed:", error);
+          return res.status(500).json({ error: "Stored global pricing is invalid" });
+        }
+      }
+    );
+  });
+
+  // Create or update a global pricing record for a machine model/profile.
+  router.patch("/pricing/global", requireAdmin, async (req, res) => {
+    const { machine_type: type, model, program_profile: profile, pricing } = req.body || {};
+    if (!["wash", "dry"].includes(type) || typeof model !== "string" ||
+        !model.trim() || model.trim().length > 100 ||
+        typeof profile !== "string" || !profile.trim() || profile.trim().length > 100 ||
+        !pricing || typeof pricing !== "object" || Array.isArray(pricing)) {
+      return res.status(400).json({ error: "Invalid machine type, model, profile or pricing" });
+    }
+    const validMoney = (v, positive = false) =>
+      typeof v === "number" && Number.isFinite(v) &&
+      (positive ? v > 0 : v >= 0) && v <= 100000 &&
+      Number.isSafeInteger(Math.round(v * 100)) &&
+      Math.abs(v * 100 - Math.round(v * 100)) < 1e-7;
+    const validPrices = obj => obj && typeof obj === "object" &&
+      !Array.isArray(obj) && Object.values(obj).every(v => validMoney(v));
+    const groups = pricing.priceGroups;
+    if (!groups || typeof groups !== "object" || Array.isArray(groups) ||
+        !Object.keys(groups).length || Object.entries(groups).some(([price, ids]) =>
+          !/^\d+(?:\.\d{1,2})?$/.test(price) || !validMoney(Number(price), true) ||
+          !Array.isArray(ids) || !ids.length ||
+          ids.some(id => !Number.isSafeInteger(id) || id <= 0))) {
+      return res.status(400).json({ error: "Invalid price groups" });
+    }
+    const programIds = Object.values(groups).flat();
+    if (new Set(programIds).size !== programIds.length) {
+      return res.status(400).json({ error: "Program appears in more than one price group" });
+    }
+    const allowed = type === "wash"
+      ? ["priceGroups", "temperaturePrice", "aromaPrice"]
+      : ["priceGroups", "temperatureRule", "wrinklePrice"];
+    if (!allowed.every(key => Object.hasOwn(pricing, key)) ||
+        Object.keys(pricing).some(key => !allowed.includes(key)) ||
+        (type === "wash" && (!validPrices(pricing.temperaturePrice) || !validMoney(pricing.aromaPrice))) ||
+        (type === "dry" && (!pricing.temperatureRule ||
+          !Array.isArray(pricing.temperatureRule.programs) ||
+          new Set(pricing.temperatureRule.programs).size !== pricing.temperatureRule.programs.length ||
+          pricing.temperatureRule.programs.some(id => !programIds.includes(id)) ||
+          !validPrices(pricing.temperatureRule.prices) || !validMoney(pricing.wrinklePrice)))) {
+      return res.status(400).json({ error: "Invalid pricing structure for machine type" });
+    }
+
+    const writeDb = new sqlite3.Database(dbPath);
+    const run = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.run(sql, params, function (err) { err ? reject(err) : resolve(this); }));
+    const get = (sql, params = []) => new Promise((resolve, reject) =>
+      writeDb.get(sql, params, (err, row) => err ? reject(err) : resolve(row)));
+    let started = false;
+    try {
+      await run("PRAGMA busy_timeout = 10000");
+      await run("BEGIN IMMEDIATE");
+      started = true;
+      const existing = await get(
+        `SELECT id FROM profile_pricing_v2
+         WHERE machine_type = ? AND model = ? AND program_profile = ?`,
+        [type, model.trim(), profile.trim()]
+      );
+      if (existing) {
+        await run(
+          `UPDATE profile_pricing_v2 SET pricing_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          [JSON.stringify(pricing), existing.id]
+        );
+      } else {
+        await run(
+          `INSERT INTO profile_pricing_v2
+             (machine_type, model, program_profile, pricing_json, updated_at)
+           VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          [type, model.trim(), profile.trim(), JSON.stringify(pricing)]
+        );
+      }
+      await run("COMMIT");
+      started = false;
+      res.set("Cache-Control", "no-store");
+      return res.json({ success: true, machine_type: type, model: model.trim(),
+        program_profile: profile.trim(), pricing });
+    } catch (error) {
+      if (started) { try { await run("ROLLBACK"); } catch (_) {} }
+      console.error("Global pricing save failed:", error);
+      return res.status(500).json({ error: "Global pricing save failed" });
+    } finally {
+      await new Promise(resolve => writeDb.close(() => resolve()));
+    }
+  });
+
   // Shop-specific pricing: read the effective catalog for a machine.
   router.get("/shops/:shopId/machines/:machine/pricing", requireAdmin, async (req, res) => {
     const { shopId, machine } = req.params;

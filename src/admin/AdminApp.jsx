@@ -312,6 +312,36 @@ export default function AdminApp() {
     }
   }
 
+  function createGlobalPricing(machineType) {
+    const template = globalPricingList.find(row => row.machine_type === machineType);
+    if (!template) {
+      setGlobalPricingError(`ยังไม่มีต้นแบบราคาประเภท${machineType === "wash" ? "เครื่องซัก" : "เครื่องอบ"} กรุณามีรายการประเภทนี้อย่างน้อยหนึ่งรายการก่อน`);
+      return;
+    }
+    setGlobalMachineType(machineType);
+    setGlobalModel("");
+    setGlobalProfile("");
+    const draft = {
+      ...template.pricing,
+      priceGroups: Object.fromEntries(
+        Object.entries(template.pricing.priceGroups || {}).map(([price, ids]) => [
+          price, Array.isArray(ids) ? ids.join(", ") : String(ids)
+        ])
+      ),
+    };
+    if (machineType === "dry") {
+      draft.temperatureRule = {
+        ...draft.temperatureRule,
+        programs: Array.isArray(draft.temperatureRule?.programs)
+          ? draft.temperatureRule.programs.join(", ")
+          : String(draft.temperatureRule?.programs ?? ""),
+      };
+    }
+    setGlobalPricingDraft(draft);
+    setGlobalPricingError("");
+    setGlobalPricingSuccess("");
+  }
+
   function selectGlobalPricing(row) {
     setGlobalMachineType(row.machine_type);
     setGlobalModel(row.model);
@@ -896,6 +926,11 @@ export default function AdminApp() {
             <p role="status" style={{ color: "green" }}>{globalPricingSuccess}</p>
           )}
 
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <button type="button" onClick={() => createGlobalPricing("wash")}>+ เพิ่มราคากลางเครื่องซัก</button>
+            <button type="button" onClick={() => createGlobalPricing("dry")}>+ เพิ่มราคากลางเครื่องอบ</button>
+          </div>
+
           <h4>รายการราคากลาง</h4>
           {globalPricingList.length === 0 ? (
             <p>ยังไม่มีรายการ หรือยังไม่ได้โหลดข้อมูล</p>
@@ -918,7 +953,7 @@ export default function AdminApp() {
           {globalPricingDraft && (
             <form onSubmit={saveGlobalPricing}>
               <hr />
-              <h4>แก้ไขราคากลาง</h4>
+              <h4>{globalPricingList.some(row => row.machine_type === globalMachineType && row.model === globalModel && row.program_profile === globalProfile) ? "แก้ไขราคากลาง" : "เพิ่มราคากลางรายการใหม่"}</h4>
 
               <p>ประเภท: {globalMachineType === "wash" ? "เครื่องซัก" : "เครื่องอบ"}</p>
 
